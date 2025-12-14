@@ -21,10 +21,10 @@ def load_data():
 df = load_data()
 
 # =====================================================
-# JUDUL
+# JUDUL DASHBOARD
 # =====================================================
 st.title("🚗 Dashboard Analisis Penjualan Mobil")
-st.caption("Portofolio Profesional Data Analyst")
+st.caption("Portfolio Profesional Data Analyst | Dataset Cleaned Car Sales")
 
 # =====================================================
 # SIDEBAR FILTER
@@ -43,13 +43,25 @@ manufacturer = st.sidebar.multiselect(
     default=df["Manufacturer"].unique()
 )
 
+harga_min, harga_max = st.sidebar.slider(
+    "Rentang Harga (Ribuan USD)",
+    float(df["Price_in_thousands"].min()),
+    float(df["Price_in_thousands"].max()),
+    (
+        float(df["Price_in_thousands"].min()),
+        float(df["Price_in_thousands"].max())
+    )
+)
+
 filtered_df = df[
     (df["Vehicle_type"].isin(jenis_kendaraan)) &
-    (df["Manufacturer"].isin(manufacturer))
+    (df["Manufacturer"].isin(manufacturer)) &
+    (df["Price_in_thousands"] >= harga_min) &
+    (df["Price_in_thousands"] <= harga_max)
 ]
 
 # =====================================================
-# RINGKASAN EKSEKUTIF
+# EXECUTIVE SUMMARY
 # =====================================================
 st.subheader("📢 Ringkasan Eksekutif")
 
@@ -60,144 +72,189 @@ if not filtered_df.empty:
         .idxmax()
     )
 
-    jenis_kendaraan_terlaris = (
-        filtered_df.groupby("Vehicle_type")["Sales_in_thousands"]
-        .sum()
-        .idxmax()
+    model_terlaris = (
+        filtered_df.sort_values("Sales_in_thousands", ascending=False)
+        .iloc[0]["Model"]
     )
-
-    total_unit = filtered_df["Sales_in_thousands"].sum()
-    total_penjualan_juta = (
-        filtered_df["Sales_in_thousands"] *
-        filtered_df["Price_in_thousands"]
-    ).sum()
 
     st.success(
         f"""
-        ✔ **Total unit terjual:** {total_unit:,.0f} ribu unit  
-        ✔ **Total penjualan:** {total_penjualan_juta:,.2f} juta USD  
-        ✔ **Manufacturer terlaris:** {brand_terlaris}  
-        ✔ **Jenis kendaraan terlaris:** {jenis_kendaraan_terlaris}  
+        ✔ **Manufacturer dengan penjualan tertinggi:** {brand_terlaris}  
+        ✔ **Model paling laris:** {model_terlaris}  
+        ✔ **Harga median pasar:** ${filtered_df['Price_in_thousands'].median():.0f}K  
         """
     )
+else:
+    st.warning("Data kosong setelah filter diterapkan.")
 
 # =====================================================
 # KPI
 # =====================================================
-col1, col2, col3 = st.columns(3)
+st.subheader("📌 Indikator Kinerja Utama (KPI)")
 
-col1.metric("Total Unit Terjual (Ribuan)", f"{total_unit:,.0f}")
-col2.metric("Total Penjualan (Juta USD)", f"{total_penjualan_juta:,.2f}")
+col1, col2, col3, col4 = st.columns(4)
+
+col1.metric("Total Penjualan", f"{filtered_df['Sales_in_thousands'].sum():,.0f} Ribu Unit")
+col2.metric("Rata-rata Harga", f"${filtered_df['Price_in_thousands'].mean():,.2f}K")
 col3.metric("Jumlah Model", filtered_df["Model"].nunique())
+col4.metric("Rata-rata Horsepower", f"{filtered_df['Horsepower'].mean():.0f} HP")
 
 # =====================================================
 # TABS
 # =====================================================
-tab1, tab2, tab3 = st.tabs(
-    ["🏆 Top Model", "🏭 Manufacturer", "📋 Data"]
+tab1, tab2, tab3, tab4, tab5 = st.tabs(
+    ["📊 Ringkasan", "📈 Analisis", "🧠 Insight", "🔮 Simulasi", "📋 Data"]
 )
 
 # =====================================================
-# TAB 1 — TOP 10 MODEL TERLARIS
+# TAB 1 — RINGKASAN
 # =====================================================
 with tab1:
-    st.subheader("🏆 10 Model Terlaris")
+    st.subheader("🏭 Total Penjualan per Manufacturer")
 
-    df_top = filtered_df.copy()
-    df_top["Total_Penjualan_Juta_USD"] = (
-        df_top["Sales_in_thousands"] *
-        df_top["Price_in_thousands"]
-    )
-
-    top_10 = (
-        df_top.sort_values("Sales_in_thousands", ascending=False)
-        .head(10)
-    )
-
-    # BAR PLOT
-    fig = px.bar(
-        top_10,
-        x="Sales_in_thousands",
-        y="Model",
-        orientation="h",
-        color="Manufacturer",
-        title="10 Model Terlaris Berdasarkan Unit Terjual",
-        labels={
-            "Sales_in_thousands": "Unit Terjual (Ribuan)",
-            "Model": "Model"
-        }
-    )
-    fig.update_layout(yaxis=dict(categoryorder="total ascending"))
-    st.plotly_chart(fig, use_container_width=True)
-
-    # TABEL
-    st.dataframe(
-        top_10[[
-            "Manufacturer",
-            "Model",
-            "Sales_in_thousands",
-            "Total_Penjualan_Juta_USD"
-        ]].rename(columns={
-            "Sales_in_thousands": "Unit Terjual (Ribuan)",
-            "Total_Penjualan_Juta_USD": "Total Penjualan (Juta USD)"
-        })
-    )
-
-    # INSIGHT OTOMATIS
-    st.info(
-        "📌 **Insight:** Model dengan unit terjual tertinggi "
-        "belum tentu menghasilkan penjualan terbesar secara nilai."
-    )
-
-# =====================================================
-# TAB 2 — MANUFACTURER
-# =====================================================
-with tab2:
-    st.subheader("🏭 Penjualan per Manufacturer")
-
-    manuf_table = (
-        filtered_df
-        .groupby("Manufacturer")
-        .agg(
-            Unit_Terjual_Ribuan=("Sales_in_thousands", "sum"),
-            Total_Penjualan_Juta_USD=(
-                "Sales_in_thousands",
-                lambda x: (x * filtered_df.loc[x.index, "Price_in_thousands"]).sum()
-            )
-        )
+    penjualan_brand = (
+        filtered_df.groupby("Manufacturer")["Sales_in_thousands"]
+        .sum()
+        .sort_values(ascending=False)
         .reset_index()
-        .sort_values("Unit_Terjual_Ribuan", ascending=False)
     )
 
     st.plotly_chart(
         px.bar(
-            manuf_table,
+            penjualan_brand,
             x="Manufacturer",
-            y="Unit_Terjual_Ribuan",
-            title="Total Unit Terjual per Manufacturer"
+            y="Sales_in_thousands",
+            title="Total Penjualan (Ribuan Unit)"
         ),
         use_container_width=True
     )
 
-    st.dataframe(manuf_table)
+    st.subheader("📊 Distribusi Harga Mobil")
 
-    st.info(
-        "📌 **Insight:** Manufacturer dengan volume tinggi "
-        "belum tentu memiliki total penjualan tertinggi."
+    st.plotly_chart(
+        px.histogram(
+            filtered_df,
+            x="Price_in_thousands",
+            nbins=30,
+            title="Distribusi Harga Mobil"
+        ),
+        use_container_width=True
     )
 
 # =====================================================
-# TAB 3 — DATA
+# TAB 2 — ANALISIS
+# =====================================================
+with tab2:
+    st.subheader("💰 Harga vs Penjualan")
+
+    st.plotly_chart(
+        px.scatter(
+            filtered_df,
+            x="Price_in_thousands",
+            y="Sales_in_thousands",
+            color="Vehicle_type",
+            size="Horsepower",
+            hover_name="Model"
+        ),
+        use_container_width=True
+    )
+
+    st.subheader("⛽ Horsepower vs Efisiensi BBM")
+
+    st.plotly_chart(
+        px.scatter(
+            filtered_df,
+            x="Horsepower",
+            y="Fuel_efficiency",
+            hover_name="Model"
+        ),
+        use_container_width=True
+    )
+
+    st.subheader("📊 Korelasi Antar Variabel")
+
+    korelasi = filtered_df.select_dtypes(include="number").corr()
+
+    st.plotly_chart(
+        px.imshow(korelasi, text_auto=True),
+        use_container_width=True
+    )
+
+# =====================================================
+# TAB 3 — INSIGHT
 # =====================================================
 with tab3:
+    st.subheader("📌 Segmentasi Harga")
+
+    filtered_df["segmen_harga"] = pd.cut(
+        filtered_df["Price_in_thousands"],
+        bins=[0, 20, 40, 100],
+        labels=["Murah", "Menengah", "Premium"]
+    )
+
+    penjualan_segmen = (
+        filtered_df.groupby("segmen_harga")["Sales_in_thousands"]
+        .sum()
+        .reset_index()
+    )
+
+    st.plotly_chart(
+        px.bar(
+            penjualan_segmen,
+            x="segmen_harga",
+            y="Sales_in_thousands",
+            title="Penjualan berdasarkan Segmen Harga"
+        ),
+        use_container_width=True
+    )
+
+    st.subheader("🏆 10 Model Terlaris")
+
+    st.dataframe(
+        filtered_df.sort_values("Sales_in_thousands", ascending=False)
+        .head(10)[["Manufacturer", "Model", "Sales_in_thousands"]]
+    )
+
+# =====================================================
+# TAB 4 — SIMULASI WHAT-IF
+# =====================================================
+with tab4:
+    st.subheader("🔮 Simulasi What-If Penjualan")
+
+    harga_simulasi = st.slider("Simulasi Harga (K USD)", 10, 60, 30)
+    hp_simulasi = st.slider("Simulasi Horsepower", 80, 400, 150)
+
+    estimasi_penjualan = (
+        filtered_df["Sales_in_thousands"].mean()
+        - (harga_simulasi - filtered_df["Price_in_thousands"].mean()) * 0.5
+        + (hp_simulasi - filtered_df["Horsepower"].mean()) * 0.02
+    )
+
+    st.success(
+        f"Estimasi penjualan ≈ **{estimasi_penjualan:.2f} ribu unit**"
+    )
+
+# =====================================================
+# TAB 5 — DATA & KUALITAS
+# =====================================================
+with tab5:
     st.subheader("📋 Data Setelah Filter")
     st.dataframe(filtered_df)
 
-    st.subheader("🧪 Kualitas Data")
+    st.subheader("🧪 Pemeriksaan Kualitas Data")
     st.dataframe(filtered_df.isnull().sum())
+
+    csv = filtered_df.to_csv(index=False).encode("utf-8")
+
+    st.download_button(
+        "⬇️ Unduh Data (CSV)",
+        csv,
+        "filtered_car_sales_data.csv",
+        "text/csv"
+    )
 
 # =====================================================
 # FOOTER
 # =====================================================
 st.markdown("---")
-st.caption("© Portofolio Data Analyst | Streamlit Dashboard")
+st.caption("© Portfolio Data Analyst | Dashboard Streamlit")
