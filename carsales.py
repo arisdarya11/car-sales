@@ -183,39 +183,32 @@ with tab2:
 # =====================================================
 # TAB 3 — INSIGHT
 # =====================================================
-with tab3:
-    st.subheader("📌 Segmentasi Harga")
+st.subheader("🏆 10 Model Terlaris")
 
-    filtered_df["segmen_harga"] = pd.cut(
-        filtered_df["Price_in_thousands"],
-        bins=[0, 20, 40, 100],
-        labels=["Murah", "Menengah", "Premium"]
-    )
+df_top = filtered_df.copy()
 
-    penjualan_segmen = (
-        filtered_df
-        .groupby("segmen_harga")["Sales_in_thousands"]
-        .sum()
-        .reset_index()
-    )
+# Hitung total penjualan dalam juta USD
+df_top["Total_Penjualan_Juta_USD"] = (
+    df_top["Sales_in_thousands"] * df_top["Price_in_thousands"]
+)
 
-    st.plotly_chart(
-        px.bar(
-            penjualan_segmen,
-            x="segmen_harga",
-            y="Sales_in_thousands",
-            title="Penjualan berdasarkan Segmen Harga"
-        ),
-        use_container_width=True
-    )
+st.dataframe(
+    df_top
+    .sort_values("Sales_in_thousands", ascending=False)
+    .head(10)[
+        [
+            "Manufacturer",
+            "Model",
+            "Sales_in_thousands",
+            "Total_Penjualan_Juta_USD"
+        ]
+    ]
+    .rename(columns={
+        "Sales_in_thousands": "Unit Terjual (Ribuan)",
+        "Total_Penjualan_Juta_USD": "Total Penjualan (Juta USD)"
+    })
+)
 
-    st.subheader("🏆 10 Model Terlaris")
-
-    st.dataframe(
-        filtered_df
-        .sort_values("Sales_in_thousands", ascending=False)
-        .head(10)[["Manufacturer", "Model", "Sales_in_thousands"]]
-    )
 
 # =====================================================
 # TAB 4 — SIMULASI WHAT-IF
