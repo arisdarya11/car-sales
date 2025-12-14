@@ -103,7 +103,7 @@ col1, col2, col3, col4 = st.columns(4)
 
 col1.metric(
     "Total Penjualan",
-    f"{filtered_df['Sales_in_thousands'].sum():,.3f} Unit"
+    f"{filtered_df['Sales_in_thousands'].sum():,.0f} Unit"
 )
 col2.metric(
     "Rata-rata Harga",
