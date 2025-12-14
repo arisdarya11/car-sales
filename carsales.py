@@ -77,9 +77,16 @@ if not filtered_df.empty:
         .iloc[0]["Model"]
     )
 
+    jenis_terlaris = (
+        filtered_df.groupby("Vehicle_type")["Sales_in_thousands"]
+        .sum()
+        .idxmax()
+    )
+
     st.success(
         f"""
         ✔ **Manufacturer dengan penjualan tertinggi:** {brand_terlaris}  
+        ✔ **Jenis kendaraan paling laku:** {jenis_terlaris}  
         ✔ **Model paling laris:** {model_terlaris}  
         ✔ **Harga median pasar:** ${filtered_df['Price_in_thousands'].median():.0f}K  
         """
@@ -94,10 +101,22 @@ st.subheader("📌 Indikator Kinerja Utama (KPI)")
 
 col1, col2, col3, col4 = st.columns(4)
 
-col1.metric("Total Penjualan", f"{filtered_df['Sales_in_thousands'].sum():,.0f} Ribu Unit")
-col2.metric("Rata-rata Harga", f"${filtered_df['Price_in_thousands'].mean():,.2f}K")
-col3.metric("Jumlah Model", filtered_df["Model"].nunique())
-col4.metric("Rata-rata Horsepower", f"{filtered_df['Horsepower'].mean():.0f} HP")
+col1.metric(
+    "Total Penjualan",
+    f"{filtered_df['Sales_in_thousands'].sum():,.0f} Ribu Unit"
+)
+col2.metric(
+    "Rata-rata Harga",
+    f"${filtered_df['Price_in_thousands'].mean():,.2f}K"
+)
+col3.metric(
+    "Jumlah Model",
+    filtered_df["Model"].nunique()
+)
+col4.metric(
+    "Rata-rata Horsepower",
+    f"{filtered_df['Horsepower'].mean():.0f} HP"
+)
 
 # =====================================================
 # TABS
@@ -124,7 +143,7 @@ with tab1:
             penjualan_brand,
             x="Manufacturer",
             y="Sales_in_thousands",
-            title="Total Penjualan (Ribuan Unit)"
+            title="Total Penjualan per Manufacturer (Ribu Unit)"
         ),
         use_container_width=True
     )
@@ -136,7 +155,7 @@ with tab1:
             filtered_df,
             x="Price_in_thousands",
             nbins=30,
-            title="Distribusi Harga Mobil"
+            title="Distribusi Harga Mobil (Ribuan USD)"
         ),
         use_container_width=True
     )
@@ -208,11 +227,69 @@ with tab3:
         use_container_width=True
     )
 
-    st.subheader("🏆 10 Model Terlaris")
+    # ==============================
+    # Jenis Kendaraan Terlaris
+    # ==============================
+    st.subheader("🚘 Jenis Kendaraan dengan Penjualan Tertinggi")
+
+    penjualan_jenis = (
+        filtered_df.groupby("Vehicle_type")["Sales_in_thousands"]
+        .sum()
+        .reset_index()
+        .sort_values("Sales_in_thousands", ascending=False)
+    )
+
+    st.plotly_chart(
+        px.bar(
+            penjualan_jenis,
+            x="Vehicle_type",
+            y="Sales_in_thousands",
+            title="Total Penjualan Berdasarkan Jenis Kendaraan"
+        ),
+        use_container_width=True
+    )
+
+    st.info(
+        f"🔎 **Insight:** Jenis kendaraan paling diminati pasar adalah "
+        f"**{penjualan_jenis.iloc[0]['Vehicle_type']}**."
+    )
+
+    # ==============================
+    # 10 Model Terlaris (Unit)
+    # ==============================
+    st.subheader("🏆 10 Model Terlaris (Unit Terjual)")
+
+    top_10_model = (
+        filtered_df.sort_values("Sales_in_thousands", ascending=False)
+        .head(10)
+    )
 
     st.dataframe(
-        filtered_df.sort_values("Sales_in_thousands", ascending=False)
-        .head(10)[["Manufacturer", "Model", "Sales_in_thousands"]]
+        top_10_model[
+            ["Manufacturer", "Model", "Sales_in_thousands"]
+        ]
+        .rename(columns={"Sales_in_thousands": "Unit Terjual (Ribu)"})
+    )
+
+    # ==============================
+    # Total Penjualan Juta USD
+    # ==============================
+    st.subheader("💵 Total Penjualan 10 Model Terlaris (Juta USD)")
+
+    top_10_model["Total_Penjualan_Juta_USD"] = (
+        top_10_model["Sales_in_thousands"] *
+        top_10_model["Price_in_thousands"]
+    )
+
+    st.plotly_chart(
+        px.bar(
+            top_10_model,
+            x="Model",
+            y="Total_Penjualan_Juta_USD",
+            color="Manufacturer",
+            title="Total Penjualan 10 Model Terlaris (Juta USD)"
+        ),
+        use_container_width=True
     )
 
 # =====================================================
@@ -257,4 +334,4 @@ with tab5:
 # FOOTER
 # =====================================================
 st.markdown("---")
-st.caption("© Portfolio Data Analyst | Dashboard Streamlit")
+st.caption("© Portfolio Profesional Data Analyst | Streamlit Dashboard")
