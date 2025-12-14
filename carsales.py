@@ -183,6 +183,30 @@ with tab2:
 # =====================================================
 # TAB 3 — INSIGHT
 # =====================================================
+with tab3:
+    st.subheader("📌 Segmentasi Harga")
+
+    filtered_df["segmen_harga"] = pd.cut(
+        filtered_df["Price_in_thousands"],
+        bins=[0, 20, 40, 100],
+        labels=["Murah", "Menengah", "Premium"]
+    )
+
+    penjualan_segmen = (
+        filtered_df.groupby("segmen_harga")["Sales_in_thousands"]
+        .sum()
+        .reset_index()
+    )
+
+    st.plotly_chart(
+        px.bar(
+            penjualan_segmen,
+            x="segmen_harga",
+            y="Sales_in_thousands",
+            title="Penjualan berdasarkan Segmen Harga"
+        ),
+        use_container_width=True
+    )
 st.subheader("🏆 10 Model Terlaris")
 
 df_top = filtered_df.copy()
