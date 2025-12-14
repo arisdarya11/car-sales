@@ -86,10 +86,10 @@ if not filtered_df.empty:
 
     st.success(
         f"""
-        ✔ **Branch dengan penjualan tertinggi adalah ** {brand_terlaris}  
+        ✔ **Branch dengan penjualan tertinggi adalah** {brand_terlaris}  
         ✔ **Model paling laris adalah** {model_terlaris}  
-        ✔ **Jenis kendaraan dengan penjualan tertinggi adalah ** {jenis_kendaraan_terlaris}  
-        ✔ **Harga median pasar adalah ** ${filtered_df['Price_in_thousands'].median():.0f}K  
+        ✔ **Jenis kendaraan dengan penjualan tertinggi adalah** {jenis_kendaraan_terlaris}  
+        ✔ **Harga median pasar adalah** ${filtered_df['Price_in_thousands'].median():.0f}K  
         """
     )
 else:
