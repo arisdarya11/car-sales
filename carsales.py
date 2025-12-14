@@ -77,10 +77,18 @@ if not filtered_df.empty:
         .iloc[0]["Model"]
     )
 
+    jenis_kendaraan_terlaris = (
+        filtered_df
+        .groupby("Vehicle_type")["Sales_in_thousands"]
+        .sum()
+        .idxmax()
+    )
+
     st.success(
         f"""
-        ✔ **Manufacturer dengan penjualan tertinggi:** {brand_terlaris}  
+        ✔ **Branch dengan penjualan tertinggi:** {brand_terlaris}  
         ✔ **Model paling laris:** {model_terlaris}  
+        ✔ **Jenis kendaraan dengan penjualan tertinggi:** {jenis_kendaraan_terlaris}  
         ✔ **Harga median pasar:** ${filtered_df['Price_in_thousands'].median():.0f}K  
         """
     )
