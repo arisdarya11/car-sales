@@ -94,7 +94,7 @@ st.subheader("📌 Indikator Kinerja Utama (KPI)")
 
 col1, col2, col3, col4 = st.columns(4)
 
-col1.metric("Total Penjualan", f"{filtered_df['Sales_in_thousands'].sum():,.2f} Ribu Unit")
+col1.metric("Total Penjualan", f"{filtered_df['Sales_in_thousands'].sum():,.0f}Unit")
 col2.metric("Rata-rata Harga", f"${filtered_df['Price_in_thousands'].mean():,.2f}K")
 col3.metric("Jumlah Model", filtered_df["Model"].nunique())
 col4.metric("Rata-rata Horsepower", f"{filtered_df['Horsepower'].mean():.0f} HP")
