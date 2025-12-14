@@ -61,14 +61,6 @@ filtered_df = df[
 ]
 
 # =====================================================
-# HITUNG TOTAL PENJUALAN (JUTA USD)
-# =====================================================
-filtered_df["Total_Penjualan_Juta_USD"] = (
-    filtered_df["Sales_in_thousands"] *
-    filtered_df["Price_in_thousands"]
-)
-
-# =====================================================
 # EXECUTIVE SUMMARY
 # =====================================================
 st.subheader("📢 Ringkasan Eksekutif")
@@ -76,7 +68,8 @@ st.subheader("📢 Ringkasan Eksekutif")
 if not filtered_df.empty:
     brand_terlaris = (
         filtered_df.groupby("Manufacturer")["Sales_in_thousands"]
-        .sum().idxmax()
+        .sum()
+        .idxmax()
     )
 
     model_terlaris = (
@@ -86,14 +79,15 @@ if not filtered_df.empty:
 
     jenis_terlaris = (
         filtered_df.groupby("Vehicle_type")["Sales_in_thousands"]
-        .sum().idxmax()
+        .sum()
+        .idxmax()
     )
 
     st.success(
         f"""
-        ✔ **Manufacturer dengan penjualan tertinggi:** {brand_terlaris}  
-        ✔ **Jenis kendaraan paling laku:** {jenis_terlaris}  
-        ✔ **Model paling laris:** {model_terlaris}  
+        ✔ **Manufacturer terlaris:** {brand_terlaris}  
+        ✔ **Jenis kendaraan terlaris:** {jenis_terlaris}  
+        ✔ **Model paling laku:** {model_terlaris}  
         ✔ **Harga median pasar:** ${filtered_df['Price_in_thousands'].median():.0f}K  
         """
     )
@@ -105,25 +99,21 @@ else:
 # =====================================================
 st.subheader("📌 Indikator Kinerja Utama (KPI)")
 
-col1, col2, col3, col4, col5 = st.columns(5)
+col1, col2, col3, col4 = st.columns(4)
 
 col1.metric(
-    "Total Unit Terjual",
-    f"{(filtered_df['Sales_in_thousands'].sum() * 1000):,.0f} Unit"
+    "Total Penjualan",
+    f"{filtered_df['Sales_in_thousands'].sum():,.0f} Unit"
 )
 col2.metric(
-    "Total Penjualan",
-    f"${filtered_df['Total_Penjualan_Juta_USD'].sum():,.2f} Juta"
-)
-col3.metric(
     "Rata-rata Harga",
     f"${filtered_df['Price_in_thousands'].mean():,.2f}K"
 )
-col4.metric(
+col3.metric(
     "Jumlah Model",
     filtered_df["Model"].nunique()
 )
-col5.metric(
+col4.metric(
     "Rata-rata Horsepower",
     f"{filtered_df['Horsepower'].mean():.0f} HP"
 )
@@ -143,7 +133,9 @@ with tab1:
 
     penjualan_brand = (
         filtered_df.groupby("Manufacturer")["Sales_in_thousands"]
-        .sum().sort_values(ascending=False).reset_index()
+        .sum()
+        .sort_values(ascending=False)
+        .reset_index()
     )
 
     st.plotly_chart(
@@ -169,9 +161,24 @@ with tab1:
     )
 
 # =====================================================
-# TAB 2 — ANALISIS
+# TAB 2 — ANALISIS (❌ TANPA TRENDLINE)
 # =====================================================
 with tab2:
+    st.subheader("💰 Harga vs Penjualan")
+
+    st.plotly_chart(
+        px.scatter(
+            filtered_df,
+            x="Price_in_thousands",
+            y="Sales_in_thousands",
+            color="Vehicle_type",
+            size="Horsepower",
+            hover_name="Model",
+            title="Harga vs Penjualan"
+        ),
+        use_container_width=True
+    )
+
     st.subheader("⛽ Horsepower vs Efisiensi BBM")
 
     st.plotly_chart(
@@ -179,9 +186,8 @@ with tab2:
             filtered_df,
             x="Horsepower",
             y="Fuel_efficiency",
-            color="Vehicle_type",
-            trendline="ols",
-            hover_name="Model"
+            hover_name="Model",
+            title="Horsepower vs Efisiensi Bahan Bakar"
         ),
         use_container_width=True
     )
@@ -190,57 +196,61 @@ with tab2:
 # TAB 3 — INSIGHT + KLASTER
 # =====================================================
 with tab3:
-    st.subheader("🧠 Klaster Efisiensi Bahan Bakar")
+    st.subheader("📌 Segmentasi Harga")
+
+    filtered_df["segmen_harga"] = pd.cut(
+        filtered_df["Price_in_thousands"],
+        bins=[0, 20, 40, 100],
+        labels=["Murah", "Menengah", "Premium"]
+    )
+
+    penjualan_segmen = (
+        filtered_df.groupby("segmen_harga")["Sales_in_thousands"]
+        .sum()
+        .reset_index()
+    )
+
+    st.plotly_chart(
+        px.bar(
+            penjualan_segmen,
+            x="segmen_harga",
+            y="Sales_in_thousands",
+            title="Penjualan berdasarkan Segmen Harga"
+        ),
+        use_container_width=True
+    )
+
+    # ==========================
+    # KLASTER EFISIENSI BBM
+    # ==========================
+    st.subheader("🧠 Klaster Efisiensi Kendaraan")
 
     def klasifikasi_efisiensi(row):
-        if row["Horsepower"] <= 130 and row["Fuel_efficiency"] >= 27:
-            return "Low HP - High Efficiency (City Car)"
-        elif 130 < row["Horsepower"] <= 220 and 20 <= row["Fuel_efficiency"] < 27:
-            return "Medium HP - Medium Efficiency (Sedan/Keluarga)"
+        if row["Horsepower"] < 120 and row["Fuel_efficiency"] > 25:
+            return "Low HP – High Efficiency (City Car)"
+        elif row["Horsepower"] <= 200:
+            return "Medium HP – Medium Efficiency (Sedan/Keluarga)"
         else:
-            return "High HP - Low Efficiency (SUV/Premium)"
+            return "High HP – Low Efficiency (SUV/Premium)"
 
-    filtered_df["Klaster_Efisiensi"] = filtered_df.apply(
+    filtered_df["klaster_efisiensi"] = filtered_df.apply(
         klasifikasi_efisiensi, axis=1
     )
 
     penjualan_klaster = (
-        filtered_df
-        .groupby("Klaster_Efisiensi")
-        .agg(
-            Total_Unit_Ribu=("Sales_in_thousands", "sum"),
-            Total_Penjualan_Juta_USD=("Total_Penjualan_Juta_USD", "sum"),
-            Jumlah_Model=("Model", "nunique")
-        )
+        filtered_df.groupby("klaster_efisiensi")["Sales_in_thousands"]
+        .sum()
         .reset_index()
-    )
-
-    st.dataframe(
-        penjualan_klaster.rename(columns={
-            "Klaster_Efisiensi": "Segmen Kendaraan",
-            "Total_Unit_Ribu": "Total Unit Terjual (Ribu)",
-            "Total_Penjualan_Juta_USD": "Total Penjualan (Juta USD)",
-            "Jumlah_Model": "Jumlah Model"
-        })
     )
 
     st.plotly_chart(
         px.bar(
             penjualan_klaster,
-            x="Klaster_Efisiensi",
-            y="Total_Penjualan_Juta_USD",
-            title="Total Penjualan Berdasarkan Klaster Efisiensi (Juta USD)"
+            x="klaster_efisiensi",
+            y="Sales_in_thousands",
+            title="Penjualan Berdasarkan Klaster Efisiensi BBM"
         ),
         use_container_width=True
-    )
-
-    klaster_terbaik = penjualan_klaster.sort_values(
-        "Total_Penjualan_Juta_USD", ascending=False
-    ).iloc[0]["Klaster_Efisiensi"]
-
-    st.info(
-        f"🔎 **Insight:** Klaster paling bernilai secara bisnis adalah "
-        f"**{klaster_terbaik}**."
     )
 
 # =====================================================
@@ -268,9 +278,6 @@ with tab4:
 with tab5:
     st.subheader("📋 Data Setelah Filter")
     st.dataframe(filtered_df)
-
-    st.subheader("🧪 Kualitas Data")
-    st.dataframe(filtered_df.isnull().sum())
 
 # =====================================================
 # FOOTER
