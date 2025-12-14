@@ -61,6 +61,14 @@ filtered_df = df[
 ]
 
 # =====================================================
+# HITUNG TOTAL PENJUALAN (JUTA USD)
+# =====================================================
+filtered_df["Total_Penjualan_Juta_USD"] = (
+    filtered_df["Sales_in_thousands"] *
+    filtered_df["Price_in_thousands"]
+)
+
+# =====================================================
 # EXECUTIVE SUMMARY
 # =====================================================
 st.subheader("📢 Ringkasan Eksekutif")
@@ -68,8 +76,7 @@ st.subheader("📢 Ringkasan Eksekutif")
 if not filtered_df.empty:
     brand_terlaris = (
         filtered_df.groupby("Manufacturer")["Sales_in_thousands"]
-        .sum()
-        .idxmax()
+        .sum().idxmax()
     )
 
     model_terlaris = (
@@ -79,8 +86,7 @@ if not filtered_df.empty:
 
     jenis_terlaris = (
         filtered_df.groupby("Vehicle_type")["Sales_in_thousands"]
-        .sum()
-        .idxmax()
+        .sum().idxmax()
     )
 
     st.success(
@@ -99,21 +105,25 @@ else:
 # =====================================================
 st.subheader("📌 Indikator Kinerja Utama (KPI)")
 
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3, col4, col5 = st.columns(5)
 
 col1.metric(
-    "Total Penjualan",
-    f"{filtered_df['Sales_in_thousands'].sum():,.0f} Unit"
+    "Total Unit Terjual",
+    f"{(filtered_df['Sales_in_thousands'].sum() * 1000):,.0f} Unit"
 )
 col2.metric(
+    "Total Penjualan",
+    f"${filtered_df['Total_Penjualan_Juta_USD'].sum():,.2f} Juta"
+)
+col3.metric(
     "Rata-rata Harga",
     f"${filtered_df['Price_in_thousands'].mean():,.2f}K"
 )
-col3.metric(
+col4.metric(
     "Jumlah Model",
     filtered_df["Model"].nunique()
 )
-col4.metric(
+col5.metric(
     "Rata-rata Horsepower",
     f"{filtered_df['Horsepower'].mean():.0f} HP"
 )
@@ -133,9 +143,7 @@ with tab1:
 
     penjualan_brand = (
         filtered_df.groupby("Manufacturer")["Sales_in_thousands"]
-        .sum()
-        .sort_values(ascending=False)
-        .reset_index()
+        .sum().sort_values(ascending=False).reset_index()
     )
 
     st.plotly_chart(
@@ -164,20 +172,6 @@ with tab1:
 # TAB 2 — ANALISIS
 # =====================================================
 with tab2:
-    st.subheader("💰 Harga vs Penjualan")
-
-    st.plotly_chart(
-        px.scatter(
-            filtered_df,
-            x="Price_in_thousands",
-            y="Sales_in_thousands",
-            color="Vehicle_type",
-            size="Horsepower",
-            hover_name="Model"
-        ),
-        use_container_width=True
-    )
-
     st.subheader("⛽ Horsepower vs Efisiensi BBM")
 
     st.plotly_chart(
@@ -185,115 +179,72 @@ with tab2:
             filtered_df,
             x="Horsepower",
             y="Fuel_efficiency",
+            color="Vehicle_type",
+            trendline="ols",
             hover_name="Model"
         ),
         use_container_width=True
     )
 
-    st.subheader("📊 Korelasi Antar Variabel")
-
-    korelasi = filtered_df.select_dtypes(include="number").corr()
-
-    st.plotly_chart(
-        px.imshow(korelasi, text_auto=True),
-        use_container_width=True
-    )
-
 # =====================================================
-# TAB 3 — INSIGHT
+# TAB 3 — INSIGHT + KLASTER
 # =====================================================
 with tab3:
-    st.subheader("📌 Segmentasi Harga")
+    st.subheader("🧠 Klaster Efisiensi Bahan Bakar")
 
-    filtered_df["segmen_harga"] = pd.cut(
-        filtered_df["Price_in_thousands"],
-        bins=[0, 20, 40, 100],
-        labels=["Murah", "Menengah", "Premium"]
+    def klasifikasi_efisiensi(row):
+        if row["Horsepower"] <= 130 and row["Fuel_efficiency"] >= 27:
+            return "Low HP - High Efficiency (City Car)"
+        elif 130 < row["Horsepower"] <= 220 and 20 <= row["Fuel_efficiency"] < 27:
+            return "Medium HP - Medium Efficiency (Sedan/Keluarga)"
+        else:
+            return "High HP - Low Efficiency (SUV/Premium)"
+
+    filtered_df["Klaster_Efisiensi"] = filtered_df.apply(
+        klasifikasi_efisiensi, axis=1
     )
 
-    penjualan_segmen = (
-        filtered_df.groupby("segmen_harga")["Sales_in_thousands"]
-        .sum()
+    penjualan_klaster = (
+        filtered_df
+        .groupby("Klaster_Efisiensi")
+        .agg(
+            Total_Unit_Ribu=("Sales_in_thousands", "sum"),
+            Total_Penjualan_Juta_USD=("Total_Penjualan_Juta_USD", "sum"),
+            Jumlah_Model=("Model", "nunique")
+        )
         .reset_index()
-    )
-
-    st.plotly_chart(
-        px.bar(
-            penjualan_segmen,
-            x="segmen_harga",
-            y="Sales_in_thousands",
-            title="Penjualan berdasarkan Segmen Harga"
-        ),
-        use_container_width=True
-    )
-
-    # ==============================
-    # Jenis Kendaraan Terlaris
-    # ==============================
-    st.subheader("🚘 Jenis Kendaraan dengan Penjualan Tertinggi")
-
-    penjualan_jenis = (
-        filtered_df.groupby("Vehicle_type")["Sales_in_thousands"]
-        .sum()
-        .reset_index()
-        .sort_values("Sales_in_thousands", ascending=False)
-    )
-
-    st.plotly_chart(
-        px.bar(
-            penjualan_jenis,
-            x="Vehicle_type",
-            y="Sales_in_thousands",
-            title="Total Penjualan Berdasarkan Jenis Kendaraan"
-        ),
-        use_container_width=True
-    )
-
-    st.info(
-        f"🔎 **Insight:** Jenis kendaraan paling diminati pasar adalah "
-        f"**{penjualan_jenis.iloc[0]['Vehicle_type']}**."
-    )
-
-    # ==============================
-    # 10 Model Terlaris (Unit)
-    # ==============================
-    st.subheader("🏆 10 Model Terlaris (Unit Terjual)")
-
-    top_10_model = (
-        filtered_df.sort_values("Sales_in_thousands", ascending=False)
-        .head(10)
     )
 
     st.dataframe(
-        top_10_model[
-            ["Manufacturer", "Model", "Sales_in_thousands"]
-        ]
-        .rename(columns={"Sales_in_thousands": "Unit Terjual (Ribu)"})
-    )
-
-    # ==============================
-    # Total Penjualan Juta USD
-    # ==============================
-    st.subheader("💵 Total Penjualan 10 Model Terlaris (Juta USD)")
-
-    top_10_model["Total_Penjualan_Juta_USD"] = (
-        top_10_model["Sales_in_thousands"] *
-        top_10_model["Price_in_thousands"]
+        penjualan_klaster.rename(columns={
+            "Klaster_Efisiensi": "Segmen Kendaraan",
+            "Total_Unit_Ribu": "Total Unit Terjual (Ribu)",
+            "Total_Penjualan_Juta_USD": "Total Penjualan (Juta USD)",
+            "Jumlah_Model": "Jumlah Model"
+        })
     )
 
     st.plotly_chart(
         px.bar(
-            top_10_model,
-            x="Model",
+            penjualan_klaster,
+            x="Klaster_Efisiensi",
             y="Total_Penjualan_Juta_USD",
-            color="Manufacturer",
-            title="Total Penjualan 10 Model Terlaris (Juta USD)"
+            title="Total Penjualan Berdasarkan Klaster Efisiensi (Juta USD)"
         ),
         use_container_width=True
     )
 
+    klaster_terbaik = penjualan_klaster.sort_values(
+        "Total_Penjualan_Juta_USD", ascending=False
+    ).iloc[0]["Klaster_Efisiensi"]
+
+    st.info(
+        f"🔎 **Insight:** Klaster paling bernilai secara bisnis adalah "
+        f"**{klaster_terbaik}**."
+    )
+
 # =====================================================
-# TAB 4 — SIMULASI WHAT-IF
+# TAB 4 — SIMULASI
 # =====================================================
 with tab4:
     st.subheader("🔮 Simulasi What-If Penjualan")
@@ -312,23 +263,14 @@ with tab4:
     )
 
 # =====================================================
-# TAB 5 — DATA & KUALITAS
+# TAB 5 — DATA
 # =====================================================
 with tab5:
     st.subheader("📋 Data Setelah Filter")
     st.dataframe(filtered_df)
 
-    st.subheader("🧪 Pemeriksaan Kualitas Data")
+    st.subheader("🧪 Kualitas Data")
     st.dataframe(filtered_df.isnull().sum())
-
-    csv = filtered_df.to_csv(index=False).encode("utf-8")
-
-    st.download_button(
-        "⬇️ Unduh Data (CSV)",
-        csv,
-        "filtered_car_sales_data.csv",
-        "text/csv"
-    )
 
 # =====================================================
 # FOOTER
