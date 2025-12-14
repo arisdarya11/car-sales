@@ -184,16 +184,29 @@ with tab2:
 # TAB 3 — INSIGHT
 # =====================================================
 with tab3:
-    st.subheader("📌 Segmentasi Harga")
+    st.subheader("📌 Segmentasi Harga berdasarkan Manufacturer")
 
+    # Membuat kolom segmentasi harga
+    filtered_df = filtered_df.copy()
     filtered_df["segmen_harga"] = pd.cut(
         filtered_df["Price_in_thousands"],
         bins=[0, 20, 40, 100],
         labels=["Murah", "Menengah", "Premium"]
     )
 
+    # Pilih manufacturer untuk insight
+    manuf_pilihan = st.selectbox(
+        "Pilih Manufacturer",
+        filtered_df["Manufacturer"].unique()
+    )
+
+    df_manuf = filtered_df[
+        filtered_df["Manufacturer"] == manuf_pilihan
+    ]
+
+    # Agregasi penjualan per segmen harga
     penjualan_segmen = (
-        filtered_df.groupby("segmen_harga")["Sales_in_thousands"]
+        df_manuf.groupby("segmen_harga")["Sales_in_thousands"]
         .sum()
         .reset_index()
     )
@@ -203,16 +216,20 @@ with tab3:
             penjualan_segmen,
             x="segmen_harga",
             y="Sales_in_thousands",
-            title="Penjualan berdasarkan Segmen Harga"
+            title=f"Penjualan berdasarkan Segmen Harga — {manuf_pilihan}",
+            labels={
+                "segmen_harga": "Segmen Harga",
+                "Sales_in_thousands": "Penjualan (Ribuan Unit)"
+            }
         ),
         use_container_width=True
     )
 
-    st.subheader("🏆 10 Model Terlaris")
+    st.subheader(f"🏆 10 Model Terlaris — {manuf_pilihan}")
 
     st.dataframe(
-        filtered_df.sort_values("Sales_in_thousands", ascending=False)
-        .head(10)[["Manufacturer", "Model", "Sales_in_thousands"]]
+        df_manuf.sort_values("Sales_in_thousands", ascending=False)
+        .head(10)[["Model", "Price_in_thousands", "Sales_in_thousands"]]
     )
 
 # =====================================================
