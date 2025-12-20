@@ -119,9 +119,10 @@ st.subheader("📌 Indikator Kinerja Utama (KPI)")
 
 col1, col2, col3, col4, col5 = st.columns(5)
 
-col1.metric("Total Unit Terjual",
-            f"{filtered_df['Sales_in_thousands'].sum():,.0f} Unit")
+total_unit = filtered_df["Sales_in_thousands"].sum() * 1_000
 
+col1.metric("Total Unit Terjual",
+            f"{total_unit:,.0f} Unit"
 col2.metric("Total Pendapatan",
             f"${filtered_df['Total_Revenue_USD'].sum()/1_000_000_000:,.2f} B")
 
