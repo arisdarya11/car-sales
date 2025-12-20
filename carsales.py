@@ -18,7 +18,6 @@ st.set_page_config(
 def load_data():
     df = pd.read_csv("cleaned_car_sales_data.csv")
 
-    # Pastikan kolom launch aman
     if "Latest_Launch" in df.columns:
         df["Latest_Launch"] = pd.to_datetime(df["Latest_Launch"], errors="coerce")
         df["Launch_Year"] = df["Latest_Launch"].dt.year
@@ -106,7 +105,6 @@ if not filtered_df.empty:
         ✔ **Manufacturer terlaris:** {brand_terlaris}  
         ✔ **Jenis kendaraan terlaris:** {jenis_terlaris}  
         ✔ **Model paling laku:** {model_terlaris}  
-        ✔ **Harga median pasar:** ${filtered_df['Price_in_thousands'].median():.0f}K  
         """
     )
 else:
@@ -117,22 +115,27 @@ else:
 # =====================================================
 st.subheader("📌 Indikator Kinerja Utama (KPI)")
 
-col1, col2, col3, col4, col5 = st.columns(5)
+col1, col2, col3, col4 = st.columns(4)
 
-col1.metric("Total Unit Terjual",
-            f"{filtered_df["Sales_in_thousands"].sum() * 1_000:,.0f} Unit")
+col1.metric(
+    "Total Unit Terjual",
+    f"{filtered_df['Sales_in_thousands'].sum() * 1_000:,.0f} Unit"
+)
 
-col2.metric("Total Pendapatan",
-            f"${filtered_df['Total_Revenue_USD'].sum()/1_000_000_000:,.2f} B")
+col2.metric(
+    "Total Pendapatan",
+    f"${filtered_df['Total_Revenue_USD'].sum() / 1_000_000_000:,.2f} B"
+)
 
-col3.metric("Rata-rata Harga",
-            f"${filtered_df['Price_in_thousands'].mean():,.2f}K")
+col3.metric(
+    "Rata-rata Harga",
+    f"${filtered_df['Price_in_thousands'].mean():,.2f}K"
+)
 
-col4.metric("Jumlah Model",
-            filtered_df["Model"].nunique())
-
-col5.metric("Rata-rata Horsepower",
-            f"{filtered_df['Horsepower'].mean():.0f} HP")
+col4.metric(
+    "Jumlah Model",
+    filtered_df["Model"].nunique()
+)
 
 # =====================================================
 # TABS
@@ -164,9 +167,9 @@ with tab1:
         use_container_width=True
     )
 
-    # =================================================
-    # TREN PENJUALAN 2008–2012 (FIXED AXIS)
-    # =================================================
+    # ===============================
+    # TREN PENJUALAN 2008–2012
+    # ===============================
     st.subheader("📈 Tren Penjualan Berdasarkan Tahun Launch (2008–2012)")
 
     trend_df = filtered_df[
@@ -189,7 +192,6 @@ with tab1:
             title="Tren Penjualan Mobil Tahun 2008–2012"
         )
 
-        # 🔑 FIX: hilangkan 2008.5, 2009.5, dst
         fig.update_xaxes(
             tickmode="array",
             tickvals=[2008, 2009, 2010, 2011, 2012],
@@ -199,36 +201,6 @@ with tab1:
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("Tidak ada data launch tahun 2008–2012.")
-
-    # =================================================
-    # MODEL BARU VS MODEL LAMA
-    # =================================================
-    if filtered_df["Launch_Year"].notna().any():
-        latest_year = int(filtered_df["Launch_Year"].max())
-
-        filtered_df["Kategori_Model"] = filtered_df["Launch_Year"].apply(
-            lambda x: "Model Baru (≤3 Tahun)"
-            if pd.notna(x) and x >= latest_year - 3
-            else "Model Lama (>3 Tahun)"
-            if pd.notna(x)
-            else "Unknown"
-        )
-
-        penjualan_model = (
-            filtered_df.groupby("Kategori_Model")["Sales_in_thousands"]
-            .sum()
-            .reset_index()
-        )
-
-        st.plotly_chart(
-            px.bar(
-                penjualan_model,
-                x="Kategori_Model",
-                y="Sales_in_thousands",
-                title="Perbandingan Penjualan Model Baru vs Model Lama"
-            ),
-            use_container_width=True
-        )
 
 # =====================================================
 # TAB 2 — ANALISIS
