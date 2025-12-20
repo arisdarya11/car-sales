@@ -106,7 +106,8 @@ if not filtered_df.empty:
         ✔ **Manufacturer terlaris:** {brand_terlaris}  
         ✔ **Jenis kendaraan terlaris:** {jenis_terlaris}  
         ✔ **Model paling laku:** {model_terlaris}  
-      
+        ✔ **Harga median pasar:** ${filtered_df['Price_in_thousands'].median():.0f}K  
+        """
     )
 else:
     st.warning("Data kosong setelah filter diterapkan.")
@@ -129,6 +130,9 @@ col3.metric("Rata-rata Harga",
 
 col4.metric("Jumlah Model",
             filtered_df["Model"].nunique())
+
+col5.metric("Rata-rata Horsepower",
+            f"{filtered_df['Horsepower'].mean():.0f} HP")
 
 # =====================================================
 # TABS
