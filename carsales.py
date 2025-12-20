@@ -16,7 +16,10 @@ st.set_page_config(
 # =====================================================
 @st.cache_data
 def load_data():
-    return pd.read_csv("cleaned_car_sales_data.csv")
+    df = pd.read_csv("cleaned_car_sales_data.csv")
+    df["Latest_Launch"] = pd.to_datetime(df["Latest_Launch"], errors="coerce")
+    df["Launch_Year"] = df["Latest_Launch"].dt.year
+    return df
 
 df = load_data()
 
@@ -47,18 +50,16 @@ harga_min, harga_max = st.sidebar.slider(
     "Rentang Harga (Ribuan USD)",
     float(df["Price_in_thousands"].min()),
     float(df["Price_in_thousands"].max()),
-    (
-        float(df["Price_in_thousands"].min()),
-        float(df["Price_in_thousands"].max())
-    )
+    (float(df["Price_in_thousands"].min()),
+     float(df["Price_in_thousands"].max()))
 )
 
-filtered_df = df[
+filtered_df = df.loc[
     (df["Vehicle_type"].isin(jenis_kendaraan)) &
     (df["Manufacturer"].isin(manufacturer)) &
     (df["Price_in_thousands"] >= harga_min) &
     (df["Price_in_thousands"] <= harga_max)
-]
+].copy()
 
 # =====================================================
 # HITUNG TOTAL PENDAPATAN
@@ -110,30 +111,20 @@ st.subheader("📌 Indikator Kinerja Utama (KPI)")
 
 col1, col2, col3, col4, col5 = st.columns(5)
 
-col1.metric(
-    "Total Unit Terjual",
-    f"{filtered_df['Sales_in_thousands'].sum():,.0f} Unit"
-)
+col1.metric("Total Unit Terjual",
+            f"{filtered_df['Sales_in_thousands'].sum():,.0f} Unit")
 
-col2.metric(
-    "Total Pendapatan",
-    f"${filtered_df['Total_Revenue_USD'].sum() / 1_000_000_000:,.2f} B"
-)
+col2.metric("Total Pendapatan",
+            f"${filtered_df['Total_Revenue_USD'].sum()/1_000_000_000:,.2f} B")
 
-col3.metric(
-    "Rata-rata Harga",
-    f"${filtered_df['Price_in_thousands'].mean():,.2f}K"
-)
+col3.metric("Rata-rata Harga",
+            f"${filtered_df['Price_in_thousands'].mean():,.2f}K")
 
-col4.metric(
-    "Jumlah Model",
-    filtered_df["Model"].nunique()
-)
+col4.metric("Jumlah Model",
+            filtered_df["Model"].nunique())
 
-col5.metric(
-    "Rata-rata Horsepower",
-    f"{filtered_df['Horsepower'].mean():.0f} HP"
-)
+col5.metric("Rata-rata Horsepower",
+            f"{filtered_df['Horsepower'].mean():.0f} HP")
 
 # =====================================================
 # TABS
@@ -156,61 +147,41 @@ with tab1:
     )
 
     st.plotly_chart(
-        px.bar(
-            penjualan_brand,
-            x="Manufacturer",
-            y="Sales_in_thousands",
-            title="Total Penjualan per Manufacturer (Ribu Unit)"
-        ),
+        px.bar(penjualan_brand,
+               x="Manufacturer",
+               y="Sales_in_thousands",
+               title="Total Penjualan per Manufacturer (Ribu Unit)"),
         use_container_width=True
     )
 
-    st.subheader("💰 Total Pendapatan per Manufacturer")
-
-    revenue_brand = (
-        filtered_df.groupby("Manufacturer")["Total_Revenue_USD"]
-        .sum()
-        .sort_values(ascending=False)
-        .reset_index()
-    )
-
-    st.plotly_chart(
-        px.bar(
-            revenue_brand,
-            x="Manufacturer",
-            y="Total_Revenue_USD",
-            title="Total Pendapatan per Manufacturer (USD)"
-        ),
-        use_container_width=True
-    )
     st.subheader("📈 Tren Penjualan Berdasarkan Tahun Launch")
 
     sales_launch_trend = (
-        filtered_df
-        .dropna(subset=["Latest_Launch"])
-        .groupby("Latest_Launch")["Sales_in_thousands"]
+        filtered_df.dropna(subset=["Launch_Year"])
+        .groupby("Launch_Year")["Sales_in_thousands"]
         .sum()
         .reset_index()
     )
 
     st.plotly_chart(
-        px.line(
-            sales_launch_trend,
-            x="Latest_Launch",
-            y="Sales_in_thousands",
-            markers=True,
-            title="Total Penjualan Berdasarkan Tahun Launch (Ribu Unit)"
-        ),
+        px.line(sales_launch_trend,
+                x="Launch_Year",
+                y="Sales_in_thousands",
+                markers=True,
+                title="Tren Penjualan Berdasarkan Tahun Launch"),
         use_container_width=True
     )
 
     st.subheader("🆕 Model Baru vs Model Lama")
 
+    latest_year = int(filtered_df["Launch_Year"].max())
+
     filtered_df["Kategori_Model"] = filtered_df["Launch_Year"].apply(
         lambda x: "Model Baru (≤3 Tahun)"
-        if x >= (filtered_df["Latest_Launch"].max() - 3)
+        if pd.notna(x) and x >= latest_year - 3
         else "Model Lama (>3 Tahun)"
-        if pd.notna(x) else "Unknown"
+        if pd.notna(x)
+        else "Unknown"
     )
 
     penjualan_model = (
@@ -220,12 +191,10 @@ with tab1:
     )
 
     st.plotly_chart(
-        px.bar(
-            penjualan_model,
-            x="Kategori_Model",
-            y="Sales_in_thousands",
-            title="Perbandingan Penjualan Model Baru vs Model Lama"
-        ),
+        px.bar(penjualan_model,
+               x="Kategori_Model",
+               y="Sales_in_thousands",
+               title="Perbandingan Penjualan Model Baru vs Model Lama"),
         use_container_width=True
     )
 
@@ -233,31 +202,14 @@ with tab1:
 # TAB 2 — ANALISIS
 # =====================================================
 with tab2:
-    st.subheader("💰 Harga vs Penjualan")
-
     st.plotly_chart(
-        px.scatter(
-            filtered_df,
-            x="Price_in_thousands",
-            y="Sales_in_thousands",
-            color="Vehicle_type",
-            size="Horsepower",
-            hover_name="Model",
-            title="Harga vs Penjualan"
-        ),
-        use_container_width=True
-    )
-
-    st.subheader("⛽ Horsepower vs Efisiensi BBM")
-
-    st.plotly_chart(
-        px.scatter(
-            filtered_df,
-            x="Horsepower",
-            y="Fuel_efficiency",
-            hover_name="Model",
-            title="Horsepower vs Efisiensi Bahan Bakar"
-        ),
+        px.scatter(filtered_df,
+                   x="Price_in_thousands",
+                   y="Sales_in_thousands",
+                   color="Vehicle_type",
+                   size="Horsepower",
+                   hover_name="Model",
+                   title="Harga vs Penjualan"),
         use_container_width=True
     )
 
@@ -265,8 +217,6 @@ with tab2:
 # TAB 3 — INSIGHT
 # =====================================================
 with tab3:
-    st.subheader("📌 Segmentasi Harga")
-
     filtered_df["Segmen_Harga"] = pd.cut(
         filtered_df["Price_in_thousands"],
         bins=[0, 20, 40, 100],
@@ -280,12 +230,10 @@ with tab3:
     )
 
     st.plotly_chart(
-        px.bar(
-            segmen_penjualan,
-            x="Segmen_Harga",
-            y="Sales_in_thousands",
-            title="Penjualan Berdasarkan Segmen Harga"
-        ),
+        px.bar(segmen_penjualan,
+               x="Segmen_Harga",
+               y="Sales_in_thousands",
+               title="Penjualan Berdasarkan Segmen Harga"),
         use_container_width=True
     )
 
@@ -293,8 +241,6 @@ with tab3:
 # TAB 4 — SIMULASI
 # =====================================================
 with tab4:
-    st.subheader("🔮 Simulasi What-If Penjualan")
-
     harga_simulasi = st.slider("Simulasi Harga (K USD)", 10, 60, 30)
     hp_simulasi = st.slider("Simulasi Horsepower", 80, 400, 150)
 
@@ -304,15 +250,12 @@ with tab4:
         + (hp_simulasi - filtered_df["Horsepower"].mean()) * 0.02
     )
 
-    st.success(
-        f"Estimasi penjualan ≈ **{estimasi_penjualan:.2f} ribu unit**"
-    )
+    st.success(f"Estimasi penjualan ≈ **{estimasi_penjualan:.2f} ribu unit**")
 
 # =====================================================
 # TAB 5 — DATA
 # =====================================================
 with tab5:
-    st.subheader("📋 Data Setelah Filter")
     st.dataframe(filtered_df)
 
 # =====================================================
