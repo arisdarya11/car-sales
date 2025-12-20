@@ -18,7 +18,6 @@ st.set_page_config(
 def load_data():
     return pd.read_csv("cleaned_car_sales_data.csv")
 
-
 df = load_data()
 
 # =====================================================
@@ -34,21 +33,21 @@ st.sidebar.header("🔍 Filter Data")
 
 jenis_kendaraan = st.sidebar.multiselect(
     "Jenis Kendaraan",
-    options=df["Vehicle_type"].unique(),
+    df["Vehicle_type"].unique(),
     default=df["Vehicle_type"].unique()
 )
 
 manufacturer = st.sidebar.multiselect(
     "Manufacturer",
-    options=df["Manufacturer"].unique(),
+    df["Manufacturer"].unique(),
     default=df["Manufacturer"].unique()
 )
 
 harga_min, harga_max = st.sidebar.slider(
     "Rentang Harga (Ribuan USD)",
-    min_value=float(df["Price_in_thousands"].min()),
-    max_value=float(df["Price_in_thousands"].max()),
-    value=(
+    float(df["Price_in_thousands"].min()),
+    float(df["Price_in_thousands"].max()),
+    (
         float(df["Price_in_thousands"].min()),
         float(df["Price_in_thousands"].max())
     )
