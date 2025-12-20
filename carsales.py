@@ -183,6 +183,51 @@ with tab1:
         ),
         use_container_width=True
     )
+    st.subheader("📈 Tren Penjualan Berdasarkan Tahun Launch")
+
+    sales_launch_trend = (
+        filtered_df
+        .dropna(subset=["Launch_Year"])
+        .groupby("Launch_Year")["Sales_in_thousands"]
+        .sum()
+        .reset_index()
+    )
+
+    st.plotly_chart(
+        px.line(
+            sales_launch_trend,
+            x="Launch_Year",
+            y="Sales_in_thousands",
+            markers=True,
+            title="Total Penjualan Berdasarkan Tahun Launch (Ribu Unit)"
+        ),
+        use_container_width=True
+    )
+
+    st.subheader("🆕 Model Baru vs Model Lama")
+
+    filtered_df["Kategori_Model"] = filtered_df["Launch_Year"].apply(
+        lambda x: "Model Baru (≤3 Tahun)"
+        if x >= (filtered_df["Launch_Year"].max() - 3)
+        else "Model Lama (>3 Tahun)"
+        if pd.notna(x) else "Unknown"
+    )
+
+    penjualan_model = (
+        filtered_df.groupby("Kategori_Model")["Sales_in_thousands"]
+        .sum()
+        .reset_index()
+    )
+
+    st.plotly_chart(
+        px.bar(
+            penjualan_model,
+            x="Kategori_Model",
+            y="Sales_in_thousands",
+            title="Perbandingan Penjualan Model Baru vs Model Lama"
+        ),
+        use_container_width=True
+    )
 
 # =====================================================
 # TAB 2 — ANALISIS
