@@ -50,8 +50,10 @@ harga_min, harga_max = st.sidebar.slider(
     "Rentang Harga (Ribuan USD)",
     float(df["Price_in_thousands"].min()),
     float(df["Price_in_thousands"].max()),
-    (float(df["Price_in_thousands"].min()),
-     float(df["Price_in_thousands"].max()))
+    (
+        float(df["Price_in_thousands"].min()),
+        float(df["Price_in_thousands"].max())
+    )
 )
 
 filtered_df = df.loc[
@@ -147,33 +149,44 @@ with tab1:
     )
 
     st.plotly_chart(
-        px.bar(penjualan_brand,
-               x="Manufacturer",
-               y="Sales_in_thousands",
-               title="Total Penjualan per Manufacturer (Ribu Unit)"),
+        px.bar(
+            penjualan_brand,
+            x="Manufacturer",
+            y="Sales_in_thousands",
+            title="Total Penjualan per Manufacturer (Ribu Unit)"
+        ),
         use_container_width=True
     )
 
-    st.subheader("📈 Tren Penjualan Berdasarkan Tahun Launch")
+    # =========================
+    # TREND 2008–2012
+    # =========================
+    st.subheader("📈 Tren Penjualan Berdasarkan Tahun Launch (2008–2012)")
 
     sales_launch_trend = (
-        filtered_df.dropna(subset=["Launch_Year"])
+        filtered_df[
+            (filtered_df["Launch_Year"] >= 2008) &
+            (filtered_df["Launch_Year"] <= 2012)
+        ]
         .groupby("Launch_Year")["Sales_in_thousands"]
         .sum()
         .reset_index()
     )
 
     st.plotly_chart(
-        px.line(sales_launch_trend,
-                x="Launch_Year",
-                y="Sales_in_thousands",
-                markers=True,
-                title="Tren Penjualan Berdasarkan Tahun Launch"),
+        px.line(
+            sales_launch_trend,
+            x="Launch_Year",
+            y="Sales_in_thousands",
+            markers=True,
+            title="Tren Penjualan Mobil Tahun 2008–2012"
+        ),
         use_container_width=True
     )
 
-    st.subheader("🆕 Model Baru vs Model Lama")
-
+    # =========================
+    # MODEL BARU VS LAMA
+    # =========================
     latest_year = int(filtered_df["Launch_Year"].max())
 
     filtered_df["Kategori_Model"] = filtered_df["Launch_Year"].apply(
@@ -191,10 +204,12 @@ with tab1:
     )
 
     st.plotly_chart(
-        px.bar(penjualan_model,
-               x="Kategori_Model",
-               y="Sales_in_thousands",
-               title="Perbandingan Penjualan Model Baru vs Model Lama"),
+        px.bar(
+            penjualan_model,
+            x="Kategori_Model",
+            y="Sales_in_thousands",
+            title="Perbandingan Penjualan Model Baru vs Model Lama"
+        ),
         use_container_width=True
     )
 
@@ -203,13 +218,15 @@ with tab1:
 # =====================================================
 with tab2:
     st.plotly_chart(
-        px.scatter(filtered_df,
-                   x="Price_in_thousands",
-                   y="Sales_in_thousands",
-                   color="Vehicle_type",
-                   size="Horsepower",
-                   hover_name="Model",
-                   title="Harga vs Penjualan"),
+        px.scatter(
+            filtered_df,
+            x="Price_in_thousands",
+            y="Sales_in_thousands",
+            color="Vehicle_type",
+            size="Horsepower",
+            hover_name="Model",
+            title="Harga vs Penjualan"
+        ),
         use_container_width=True
     )
 
@@ -230,10 +247,12 @@ with tab3:
     )
 
     st.plotly_chart(
-        px.bar(segmen_penjualan,
-               x="Segmen_Harga",
-               y="Sales_in_thousands",
-               title="Penjualan Berdasarkan Segmen Harga"),
+        px.bar(
+            segmen_penjualan,
+            x="Segmen_Harga",
+            y="Sales_in_thousands",
+            title="Penjualan Berdasarkan Segmen Harga"
+        ),
         use_container_width=True
     )
 
