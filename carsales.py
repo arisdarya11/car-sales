@@ -277,20 +277,6 @@ with tab3:
         use_container_width=True
     )
 
-# =====================================================
-# TAB 4 — SIMULASI
-# =====================================================
-with tab4:
-    harga_simulasi = st.slider("Simulasi Harga (K USD)", 10, 60, 30)
-    hp_simulasi = st.slider("Simulasi Horsepower", 80, 400, 150)
-
-    estimasi_penjualan = (
-        filtered_df["Sales_in_thousands"].mean()
-        - (harga_simulasi - filtered_df["Price_in_thousands"].mean()) * 0.5
-        + (hp_simulasi - filtered_df["Horsepower"].mean()) * 0.02
-    )
-
-    st.success(f"Estimasi penjualan ≈ **{estimasi_penjualan:.2f} ribu unit**")
 
 # =====================================================
 # TAB 5 — DATA
