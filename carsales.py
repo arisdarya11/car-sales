@@ -18,7 +18,7 @@ st.set_page_config(
 def load_data():
     df = pd.read_csv("cleaned_car_sales_data.csv")
 
-    # Pastikan kolom Latest_Launch ada
+    # Pastikan kolom launch aman
     if "Latest_Launch" in df.columns:
         df["Latest_Launch"] = pd.to_datetime(df["Latest_Launch"], errors="coerce")
         df["Launch_Year"] = df["Latest_Launch"].dt.year
@@ -165,7 +165,7 @@ with tab1:
     )
 
     # =================================================
-    # TREN PENJUALAN 2008–2012
+    # TREN PENJUALAN 2008–2012 (FIXED AXIS)
     # =================================================
     st.subheader("📈 Tren Penjualan Berdasarkan Tahun Launch (2008–2012)")
 
@@ -181,16 +181,22 @@ with tab1:
             .sort_values("Launch_Year")
         )
 
-        st.plotly_chart(
-            px.line(
-                sales_launch_trend,
-                x="Launch_Year",
-                y="Sales_in_thousands",
-                markers=True,
-                title="Tren Penjualan Mobil Tahun 2008–2012"
-            ),
-            use_container_width=True
+        fig = px.line(
+            sales_launch_trend,
+            x="Launch_Year",
+            y="Sales_in_thousands",
+            markers=True,
+            title="Tren Penjualan Mobil Tahun 2008–2012"
         )
+
+        # 🔑 FIX: hilangkan 2008.5, 2009.5, dst
+        fig.update_xaxes(
+            tickmode="array",
+            tickvals=[2008, 2009, 2010, 2011, 2012],
+            ticktext=["2008", "2009", "2010", "2011", "2012"]
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("Tidak ada data launch tahun 2008–2012.")
 
