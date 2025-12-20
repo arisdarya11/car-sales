@@ -187,8 +187,8 @@ with tab1:
 
     sales_launch_trend = (
         filtered_df
-        .dropna(subset=["Launch_Year"])
-        .groupby("Launch_Year")["Sales_in_thousands"]
+        .dropna(subset=["Latest_Launch"])
+        .groupby("Latest_Launch")["Sales_in_thousands"]
         .sum()
         .reset_index()
     )
@@ -196,7 +196,7 @@ with tab1:
     st.plotly_chart(
         px.line(
             sales_launch_trend,
-            x="Launch_Year",
+            x="Latest_Launch",
             y="Sales_in_thousands",
             markers=True,
             title="Total Penjualan Berdasarkan Tahun Launch (Ribu Unit)"
@@ -208,7 +208,7 @@ with tab1:
 
     filtered_df["Kategori_Model"] = filtered_df["Launch_Year"].apply(
         lambda x: "Model Baru (≤3 Tahun)"
-        if x >= (filtered_df["Launch_Year"].max() - 3)
+        if x >= (filtered_df["Latest_Launch"].max() - 3)
         else "Model Lama (>3 Tahun)"
         if pd.notna(x) else "Unknown"
     )
