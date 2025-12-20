@@ -201,6 +201,38 @@ with tab1:
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("Tidak ada data launch tahun 2008–2012.")
+# =====================================================
+# MODEL BARU VS MODEL LAMA
+# =====================================================
+if filtered_df["Launch_Year"].notna().any():
+
+    latest_year = int(filtered_df["Launch_Year"].max())
+
+    filtered_df["Kategori_Model"] = filtered_df["Launch_Year"].apply(
+        lambda x: "Model Baru (≤3 Tahun)"
+        if pd.notna(x) and x >= latest_year - 3
+        else "Model Lama (>3 Tahun)"
+        if pd.notna(x)
+        else "Unknown"
+    )
+
+    penjualan_model = (
+        filtered_df
+        .groupby("Kategori_Model")["Sales_in_thousands"]
+        .sum()
+        .reset_index()
+    )
+
+    st.plotly_chart(
+        px.bar(
+            penjualan_model,
+            x="Kategori_Model",
+            y="Sales_in_thousands",
+            title="Perbandingan Penjualan Model Baru vs Model Lama"
+        ),
+        use_container_width=True
+    )
+
 
 # =====================================================
 # TAB 2 — ANALISIS
