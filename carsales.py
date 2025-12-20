@@ -17,8 +17,14 @@ st.set_page_config(
 @st.cache_data
 def load_data():
     df = pd.read_csv("cleaned_car_sales_data.csv")
-    df["Latest_Launch"] = pd.to_datetime(df["Latest_Launch"], errors="coerce")
-    df["Launch_Year"] = df["Latest_Launch"].dt.year
+
+    # Pastikan kolom Latest_Launch ada
+    if "Latest_Launch" in df.columns:
+        df["Latest_Launch"] = pd.to_datetime(df["Latest_Launch"], errors="coerce")
+        df["Launch_Year"] = df["Latest_Launch"].dt.year
+    else:
+        df["Launch_Year"] = pd.NA
+
     return df
 
 df = load_data()
@@ -36,14 +42,14 @@ st.sidebar.header("🔍 Filter Data")
 
 jenis_kendaraan = st.sidebar.multiselect(
     "Jenis Kendaraan",
-    df["Vehicle_type"].unique(),
-    default=df["Vehicle_type"].unique()
+    df["Vehicle_type"].dropna().unique(),
+    default=df["Vehicle_type"].dropna().unique()
 )
 
 manufacturer = st.sidebar.multiselect(
     "Manufacturer",
-    df["Manufacturer"].unique(),
-    default=df["Manufacturer"].unique()
+    df["Manufacturer"].dropna().unique(),
+    default=df["Manufacturer"].dropna().unique()
 )
 
 harga_min, harga_max = st.sidebar.slider(
@@ -158,60 +164,65 @@ with tab1:
         use_container_width=True
     )
 
-    # =========================
-    # TREND 2008–2012
-    # =========================
+    # =================================================
+    # TREN PENJUALAN 2008–2012
+    # =================================================
     st.subheader("📈 Tren Penjualan Berdasarkan Tahun Launch (2008–2012)")
 
-    sales_launch_trend = (
-        filtered_df[
-            (filtered_df["Launch_Year"] >= 2008) &
-            (filtered_df["Launch_Year"] <= 2012)
-        ]
-        .groupby("Launch_Year")["Sales_in_thousands"]
-        .sum()
-        .reset_index()
-    )
+    trend_df = filtered_df[
+        filtered_df["Launch_Year"].between(2008, 2012)
+    ]
 
-    st.plotly_chart(
-        px.line(
-            sales_launch_trend,
-            x="Launch_Year",
-            y="Sales_in_thousands",
-            markers=True,
-            title="Tren Penjualan Mobil Tahun 2008–2012"
-        ),
-        use_container_width=True
-    )
+    if not trend_df.empty:
+        sales_launch_trend = (
+            trend_df.groupby("Launch_Year")["Sales_in_thousands"]
+            .sum()
+            .reset_index()
+            .sort_values("Launch_Year")
+        )
 
-    # =========================
-    # MODEL BARU VS LAMA
-    # =========================
-    latest_year = int(filtered_df["Launch_Year"].max())
+        st.plotly_chart(
+            px.line(
+                sales_launch_trend,
+                x="Launch_Year",
+                y="Sales_in_thousands",
+                markers=True,
+                title="Tren Penjualan Mobil Tahun 2008–2012"
+            ),
+            use_container_width=True
+        )
+    else:
+        st.info("Tidak ada data launch tahun 2008–2012.")
 
-    filtered_df["Kategori_Model"] = filtered_df["Launch_Year"].apply(
-        lambda x: "Model Baru (≤3 Tahun)"
-        if pd.notna(x) and x >= latest_year - 3
-        else "Model Lama (>3 Tahun)"
-        if pd.notna(x)
-        else "Unknown"
-    )
+    # =================================================
+    # MODEL BARU VS MODEL LAMA
+    # =================================================
+    if filtered_df["Launch_Year"].notna().any():
+        latest_year = int(filtered_df["Launch_Year"].max())
 
-    penjualan_model = (
-        filtered_df.groupby("Kategori_Model")["Sales_in_thousands"]
-        .sum()
-        .reset_index()
-    )
+        filtered_df["Kategori_Model"] = filtered_df["Launch_Year"].apply(
+            lambda x: "Model Baru (≤3 Tahun)"
+            if pd.notna(x) and x >= latest_year - 3
+            else "Model Lama (>3 Tahun)"
+            if pd.notna(x)
+            else "Unknown"
+        )
 
-    st.plotly_chart(
-        px.bar(
-            penjualan_model,
-            x="Kategori_Model",
-            y="Sales_in_thousands",
-            title="Perbandingan Penjualan Model Baru vs Model Lama"
-        ),
-        use_container_width=True
-    )
+        penjualan_model = (
+            filtered_df.groupby("Kategori_Model")["Sales_in_thousands"]
+            .sum()
+            .reset_index()
+        )
+
+        st.plotly_chart(
+            px.bar(
+                penjualan_model,
+                x="Kategori_Model",
+                y="Sales_in_thousands",
+                title="Perbandingan Penjualan Model Baru vs Model Lama"
+            ),
+            use_container_width=True
+        )
 
 # =====================================================
 # TAB 2 — ANALISIS
