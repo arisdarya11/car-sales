@@ -18,6 +18,7 @@ st.set_page_config(
 def load_data():
     return pd.read_csv("cleaned_car_sales_data.csv")
 
+
 df = load_data()
 
 # =====================================================
@@ -33,21 +34,21 @@ st.sidebar.header("🔍 Filter Data")
 
 jenis_kendaraan = st.sidebar.multiselect(
     "Jenis Kendaraan",
-    df["Vehicle_type"].unique(),
+    options=df["Vehicle_type"].unique(),
     default=df["Vehicle_type"].unique()
 )
 
 manufacturer = st.sidebar.multiselect(
     "Manufacturer",
-    df["Manufacturer"].unique(),
+    options=df["Manufacturer"].unique(),
     default=df["Manufacturer"].unique()
 )
 
 harga_min, harga_max = st.sidebar.slider(
     "Rentang Harga (Ribuan USD)",
-    float(df["Price_in_thousands"].min()),
-    float(df["Price_in_thousands"].max()),
-    (
+    min_value=float(df["Price_in_thousands"].min()),
+    max_value=float(df["Price_in_thousands"].max()),
+    value=(
         float(df["Price_in_thousands"].min()),
         float(df["Price_in_thousands"].max())
     )
@@ -59,16 +60,6 @@ filtered_df = df[
     (df["Price_in_thousands"] >= harga_min) &
     (df["Price_in_thousands"] <= harga_max)
 ]
-
-# =====================================================
-# KONVERSI & FITUR LATEST_LAUNCH
-# =====================================================
-filtered_df["Latest_Launch"] = pd.to_datetime(
-    filtered_df["Latest_Launch"],
-    errors="coerce"
-)
-
-filtered_df["Launch_Year"] = filtered_df["Latest_Launch"].dt.year
 
 # =====================================================
 # HITUNG TOTAL PENDAPATAN
@@ -118,7 +109,7 @@ else:
 # =====================================================
 st.subheader("📌 Indikator Kinerja Utama (KPI)")
 
-col1, col2, col3, col4, col5, col6 = st.columns(6)
+col1, col2, col3, col4, col5 = st.columns(5)
 
 col1.metric(
     "Total Unit Terjual",
@@ -144,12 +135,6 @@ col5.metric(
     "Rata-rata Horsepower",
     f"{filtered_df['Horsepower'].mean():.0f} HP"
 )
-
-if not filtered_df["Launch_Year"].isna().all():
-    col6.metric(
-        "Model Terbaru Diluncurkan",
-        int(filtered_df["Launch_Year"].max())
-    )
 
 # =====================================================
 # TABS
@@ -201,51 +186,33 @@ with tab1:
     )
 
 # =====================================================
-# TAB 2 — ANALISIS (LATEST LAUNCH + SALES)
+# TAB 2 — ANALISIS
 # =====================================================
 with tab2:
-    st.subheader("📈 Tren Penjualan Berdasarkan Tahun Launch")
-
-    sales_launch_trend = (
-        filtered_df
-        .dropna(subset=["Launch_Year"])
-        .groupby("Launch_Year")["Sales_in_thousands"]
-        .sum()
-        .reset_index()
-    )
+    st.subheader("💰 Harga vs Penjualan")
 
     st.plotly_chart(
-        px.line(
-            sales_launch_trend,
-            x="Launch_Year",
+        px.scatter(
+            filtered_df,
+            x="Price_in_thousands",
             y="Sales_in_thousands",
-            markers=True,
-            title="Total Penjualan Berdasarkan Tahun Launch (Ribu Unit)"
+            color="Vehicle_type",
+            size="Horsepower",
+            hover_name="Model",
+            title="Harga vs Penjualan"
         ),
         use_container_width=True
     )
 
-    st.subheader("🆕 Model Baru vs Model Lama")
-
-    filtered_df["Kategori_Model"] = filtered_df["Launch_Year"].apply(
-        lambda x: "Model Baru (≤3 Tahun)"
-        if x >= (filtered_df["Launch_Year"].max() - 3)
-        else "Model Lama (>3 Tahun)"
-        if pd.notna(x) else "Unknown"
-    )
-
-    penjualan_model = (
-        filtered_df.groupby("Kategori_Model")["Sales_in_thousands"]
-        .sum()
-        .reset_index()
-    )
+    st.subheader("⛽ Horsepower vs Efisiensi BBM")
 
     st.plotly_chart(
-        px.bar(
-            penjualan_model,
-            x="Kategori_Model",
-            y="Sales_in_thousands",
-            title="Perbandingan Penjualan Model Baru vs Model Lama"
+        px.scatter(
+            filtered_df,
+            x="Horsepower",
+            y="Fuel_efficiency",
+            hover_name="Model",
+            title="Horsepower vs Efisiensi Bahan Bakar"
         ),
         use_container_width=True
     )
