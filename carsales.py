@@ -24,7 +24,7 @@ df = load_data()
 # JUDUL DASHBOARD
 # =====================================================
 st.title("🚗 Dashboard Analisis Penjualan Mobil")
-st.caption("Portfolio Profesional Data Analyst | Dataset Cleaned Car Sales")
+st.caption("Car Sales Analytics & Visualization | Powered by Streamlit")
 
 # =====================================================
 # SIDEBAR FILTER
@@ -59,6 +59,15 @@ filtered_df = df[
     (df["Price_in_thousands"] >= harga_min) &
     (df["Price_in_thousands"] <= harga_max)
 ]
+
+# =====================================================
+# HITUNG TOTAL PENDAPATAN
+# =====================================================
+filtered_df["Total_Revenue_USD"] = (
+    filtered_df["Price_in_thousands"]
+    * filtered_df["Sales_in_thousands"]
+    * 1_000_000
+)
 
 # =====================================================
 # EXECUTIVE SUMMARY
@@ -99,21 +108,29 @@ else:
 # =====================================================
 st.subheader("📌 Indikator Kinerja Utama (KPI)")
 
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3, col4, col5 = st.columns(5)
 
 col1.metric(
-    "Total Penjualan",
+    "Total Unit Terjual",
     f"{filtered_df['Sales_in_thousands'].sum():,.0f} Unit"
 )
+
 col2.metric(
+    "Total Pendapatan",
+    f"${filtered_df['Total_Revenue_USD'].sum() / 1_000_000_000:,.2f} B"
+)
+
+col3.metric(
     "Rata-rata Harga",
     f"${filtered_df['Price_in_thousands'].mean():,.2f}K"
 )
-col3.metric(
+
+col4.metric(
     "Jumlah Model",
     filtered_df["Model"].nunique()
 )
-col4.metric(
+
+col5.metric(
     "Rata-rata Horsepower",
     f"{filtered_df['Horsepower'].mean():.0f} HP"
 )
@@ -148,20 +165,27 @@ with tab1:
         use_container_width=True
     )
 
-    st.subheader("📊 Distribusi Harga Mobil")
+    st.subheader("💰 Total Pendapatan per Manufacturer")
+
+    revenue_brand = (
+        filtered_df.groupby("Manufacturer")["Total_Revenue_USD"]
+        .sum()
+        .sort_values(ascending=False)
+        .reset_index()
+    )
 
     st.plotly_chart(
-        px.histogram(
-            filtered_df,
-            x="Price_in_thousands",
-            nbins=30,
-            title="Distribusi Harga Mobil (Ribuan USD)"
+        px.bar(
+            revenue_brand,
+            x="Manufacturer",
+            y="Total_Revenue_USD",
+            title="Total Pendapatan per Manufacturer (USD)"
         ),
         use_container_width=True
     )
 
 # =====================================================
-# TAB 2 — ANALISIS (❌ TANPA TRENDLINE)
+# TAB 2 — ANALISIS
 # =====================================================
 with tab2:
     st.subheader("💰 Harga vs Penjualan")
@@ -193,62 +217,29 @@ with tab2:
     )
 
 # =====================================================
-# TAB 3 — INSIGHT + KLASTER
+# TAB 3 — INSIGHT
 # =====================================================
 with tab3:
     st.subheader("📌 Segmentasi Harga")
 
-    filtered_df["segmen_harga"] = pd.cut(
+    filtered_df["Segmen_Harga"] = pd.cut(
         filtered_df["Price_in_thousands"],
         bins=[0, 20, 40, 100],
         labels=["Murah", "Menengah", "Premium"]
     )
 
-    penjualan_segmen = (
-        filtered_df.groupby("segmen_harga")["Sales_in_thousands"]
+    segmen_penjualan = (
+        filtered_df.groupby("Segmen_Harga")["Sales_in_thousands"]
         .sum()
         .reset_index()
     )
 
     st.plotly_chart(
         px.bar(
-            penjualan_segmen,
-            x="segmen_harga",
+            segmen_penjualan,
+            x="Segmen_Harga",
             y="Sales_in_thousands",
-            title="Penjualan berdasarkan Segmen Harga"
-        ),
-        use_container_width=True
-    )
-
-    # ==========================
-    # KLASTER EFISIENSI BBM
-    # ==========================
-    st.subheader("🧠 Klaster Efisiensi Kendaraan")
-
-    def klasifikasi_efisiensi(row):
-        if row["Horsepower"] < 120 and row["Fuel_efficiency"] > 25:
-            return "Low HP – High Efficiency (City Car)"
-        elif row["Horsepower"] <= 200:
-            return "Medium HP – Medium Efficiency (Sedan/Keluarga)"
-        else:
-            return "High HP – Low Efficiency (SUV/Premium)"
-
-    filtered_df["klaster_efisiensi"] = filtered_df.apply(
-        klasifikasi_efisiensi, axis=1
-    )
-
-    penjualan_klaster = (
-        filtered_df.groupby("klaster_efisiensi")["Sales_in_thousands"]
-        .sum()
-        .reset_index()
-    )
-
-    st.plotly_chart(
-        px.bar(
-            penjualan_klaster,
-            x="klaster_efisiensi",
-            y="Sales_in_thousands",
-            title="Penjualan Berdasarkan Klaster Efisiensi BBM"
+            title="Penjualan Berdasarkan Segmen Harga"
         ),
         use_container_width=True
     )
@@ -283,4 +274,4 @@ with tab5:
 # FOOTER
 # =====================================================
 st.markdown("---")
-st.caption("© Portfolio Profesional Data Analyst | Streamlit Dashboard")
+st.caption("© Portfolio Data Analyst | Dashboard built with Streamlit")
