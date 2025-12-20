@@ -61,6 +61,16 @@ filtered_df = df[
 ]
 
 # =====================================================
+# KONVERSI & FITUR LATEST_LAUNCH
+# =====================================================
+filtered_df["Latest_Launch"] = pd.to_datetime(
+    filtered_df["Latest_Launch"],
+    errors="coerce"
+)
+
+filtered_df["Launch_Year"] = filtered_df["Latest_Launch"].dt.year
+
+# =====================================================
 # HITUNG TOTAL PENDAPATAN
 # =====================================================
 filtered_df["Total_Revenue_USD"] = (
@@ -108,7 +118,7 @@ else:
 # =====================================================
 st.subheader("📌 Indikator Kinerja Utama (KPI)")
 
-col1, col2, col3, col4, col5 = st.columns(5)
+col1, col2, col3, col4, col5, col6 = st.columns(6)
 
 col1.metric(
     "Total Unit Terjual",
@@ -134,6 +144,12 @@ col5.metric(
     "Rata-rata Horsepower",
     f"{filtered_df['Horsepower'].mean():.0f} HP"
 )
+
+if not filtered_df["Launch_Year"].isna().all():
+    col6.metric(
+        "Model Terbaru Diluncurkan",
+        int(filtered_df["Launch_Year"].max())
+    )
 
 # =====================================================
 # TABS
@@ -185,33 +201,51 @@ with tab1:
     )
 
 # =====================================================
-# TAB 2 — ANALISIS
+# TAB 2 — ANALISIS (LATEST LAUNCH + SALES)
 # =====================================================
 with tab2:
-    st.subheader("💰 Harga vs Penjualan")
+    st.subheader("📈 Tren Penjualan Berdasarkan Tahun Launch")
+
+    sales_launch_trend = (
+        filtered_df
+        .dropna(subset=["Launch_Year"])
+        .groupby("Launch_Year")["Sales_in_thousands"]
+        .sum()
+        .reset_index()
+    )
 
     st.plotly_chart(
-        px.scatter(
-            filtered_df,
-            x="Price_in_thousands",
+        px.line(
+            sales_launch_trend,
+            x="Launch_Year",
             y="Sales_in_thousands",
-            color="Vehicle_type",
-            size="Horsepower",
-            hover_name="Model",
-            title="Harga vs Penjualan"
+            markers=True,
+            title="Total Penjualan Berdasarkan Tahun Launch (Ribu Unit)"
         ),
         use_container_width=True
     )
 
-    st.subheader("⛽ Horsepower vs Efisiensi BBM")
+    st.subheader("🆕 Model Baru vs Model Lama")
+
+    filtered_df["Kategori_Model"] = filtered_df["Launch_Year"].apply(
+        lambda x: "Model Baru (≤3 Tahun)"
+        if x >= (filtered_df["Launch_Year"].max() - 3)
+        else "Model Lama (>3 Tahun)"
+        if pd.notna(x) else "Unknown"
+    )
+
+    penjualan_model = (
+        filtered_df.groupby("Kategori_Model")["Sales_in_thousands"]
+        .sum()
+        .reset_index()
+    )
 
     st.plotly_chart(
-        px.scatter(
-            filtered_df,
-            x="Horsepower",
-            y="Fuel_efficiency",
-            hover_name="Model",
-            title="Horsepower vs Efisiensi Bahan Bakar"
+        px.bar(
+            penjualan_model,
+            x="Kategori_Model",
+            y="Sales_in_thousands",
+            title="Perbandingan Penjualan Model Baru vs Model Lama"
         ),
         use_container_width=True
     )
