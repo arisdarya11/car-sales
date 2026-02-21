@@ -1,1226 +1,755 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.express as px
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
+import plotly.express as px
 import warnings
 warnings.filterwarnings("ignore")
 
-# ─────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────
 # PAGE CONFIG
-# ─────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="AutoInsight · Car Sales Intelligence",
+    page_title="AutoInsight · Car Sales Dashboard",
     page_icon="🚗",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# ─────────────────────────────────────────────
-# CUSTOM CSS — Dark Luxury Theme
-# ─────────────────────────────────────────────
-st.markdown("""
+# ─────────────────────────────────────────────────────────────
+# DESIGN TOKENS
+# ─────────────────────────────────────────────────────────────
+BG       = "#F5F3EE"
+SURFACE  = "#FFFFFF"
+BORDER   = "#E5E0D8"
+INK      = "#1A1714"
+INK2     = "#6B6560"
+ACCENT   = "#C8430A"
+GREEN    = "#1A6B4A"
+BLUE     = "#1A4A6B"
+GOLD     = "#C8890A"
+CHIP_BG  = "#F0EBE3"
+GRID_CLR = "rgba(229,224,216,0.7)"
+
+SEG_COLORS  = [BLUE, GOLD, ACCENT, GREEN]
+MFR_PALETTE = [ACCENT, BLUE, GREEN, GOLD, "#6B1A4A", "#4A6B1A",
+               "#1A6B6B", "#6B4A1A", "#4A1A6B", "#6B1A1A",
+               "#C8430A", "#1A4A6B", "#1A6B4A", "#C8890A"]
+
+def plot_layout(height=300, margin=None, **kw):
+    m = margin or dict(l=8, r=8, t=32, b=8)
+    return dict(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="sans-serif", color=INK2, size=11),
+        height=height,
+        margin=m,
+        showlegend=kw.pop("showlegend", False),
+        **kw,
+    )
+
+def style_axes(fig, x_title="", y_title="", show_xgrid=True, show_ygrid=True):
+    fig.update_xaxes(
+        title_text=x_title, title_font=dict(size=10, color=INK2),
+        gridcolor=GRID_CLR, gridwidth=0.5, zeroline=False,
+        tickfont=dict(size=10, color=INK2), linecolor=BORDER,
+        showgrid=show_xgrid,
+    )
+    fig.update_yaxes(
+        title_text=y_title, title_font=dict(size=10, color=INK2),
+        gridcolor=GRID_CLR, gridwidth=0.5, zeroline=False,
+        tickfont=dict(size=10, color=INK2), linecolor=BORDER,
+        showgrid=show_ygrid,
+    )
+    return fig
+
+def ols_line(x, y):
+    """Pure numpy OLS trendline — no statsmodels needed."""
+    arr_x, arr_y = np.array(x, float), np.array(y, float)
+    mask = ~(np.isnan(arr_x) | np.isnan(arr_y))
+    xc, yc = arr_x[mask], arr_y[mask]
+    if len(xc) < 2:
+        return [], []
+    m, b = np.polyfit(xc, yc, 1)
+    x_line = np.array([xc.min(), xc.max()])
+    return x_line.tolist(), (m * x_line + b).tolist()
+
+# ─────────────────────────────────────────────────────────────
+# GLOBAL CSS
+# ─────────────────────────────────────────────────────────────
+st.markdown(f"""
 <style>
-/* ── Google Fonts ── */
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
-/* ── Root Variables ── */
-:root {
-    --navy:     #0B1622;
-    --navy2:    #111E2D;
-    --card:     #14243A;
-    --border:   #1E3250;
-    --teal:     #0EA5C9;
-    --teal2:    #06B6D4;
-    --gold:     #F59E0B;
-    --coral:    #F97316;
-    --mint:     #10B981;
-    --rose:     #F43F5E;
-    --text:     #E2E8F0;
-    --muted:    #64748B;
-    --white:    #FFFFFF;
-}
+html, body, [class*="css"] {{
+    font-family: 'Sora', sans-serif !important;
+    background-color: {BG} !important;
+    color: {INK} !important;
+}}
+.stApp {{ background-color: {BG} !important; }}
+#MainMenu, footer, header {{ visibility: hidden; }}
+.block-container {{ padding: 1.5rem 2rem 3rem !important; max-width: 1400px; }}
 
-/* ── Global ── */
-html, body, [class*="css"] {
-    font-family: 'DM Sans', sans-serif;
-    background-color: var(--navy) !important;
-    color: var(--text) !important;
-}
-.stApp { background-color: var(--navy) !important; }
-
-/* ── Hide default elements ── */
-#MainMenu, footer, header { visibility: hidden; }
-.block-container { padding: 1.5rem 2rem 3rem !important; max-width: 1400px; }
-
-/* ── Sidebar ── */
-section[data-testid="stSidebar"] {
-    background: var(--navy2) !important;
-    border-right: 1px solid var(--border);
-    padding-top: 1rem;
-}
-section[data-testid="stSidebar"] .stMarkdown h2 {
-    font-family: 'DM Serif Display', serif;
-    color: var(--teal) !important;
-    font-size: 1.1rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    margin-bottom: 0.5rem;
-}
-
-/* ── Hero Header ── */
-.hero-header {
-    background: linear-gradient(135deg, #0B1622 0%, #0A2540 50%, #0B1622 100%);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 2.5rem 3rem;
-    margin-bottom: 1.8rem;
-    position: relative;
-    overflow: hidden;
-}
-.hero-header::before {
-    content: '';
-    position: absolute;
-    top: -40px; right: -40px;
-    width: 250px; height: 250px;
-    background: radial-gradient(circle, rgba(14,165,201,0.12) 0%, transparent 70%);
-    border-radius: 50%;
-}
-.hero-header::after {
-    content: '';
-    position: absolute;
-    bottom: -60px; left: 200px;
-    width: 300px; height: 300px;
-    background: radial-gradient(circle, rgba(245,158,11,0.07) 0%, transparent 70%);
-    border-radius: 50%;
-}
-.hero-title {
-    font-family: 'DM Serif Display', serif;
-    font-size: 2.8rem;
-    color: var(--white);
-    margin: 0;
-    line-height: 1.15;
-}
-.hero-title span { color: var(--teal); }
-.hero-sub {
-    font-size: 1rem;
-    color: var(--muted);
-    margin: 0.5rem 0 0;
-    font-weight: 300;
-    letter-spacing: 0.02em;
-}
-.hero-badge {
-    display: inline-block;
-    background: rgba(14,165,201,0.15);
-    border: 1px solid rgba(14,165,201,0.3);
-    color: var(--teal);
-    padding: 0.25rem 0.85rem;
-    border-radius: 999px;
-    font-size: 0.72rem;
+/* Sidebar */
+section[data-testid="stSidebar"] {{
+    background: {SURFACE} !important;
+    border-right: 1px solid {BORDER};
+}}
+section[data-testid="stSidebar"] .stMarkdown p,
+section[data-testid="stSidebar"] label {{
+    font-size: 0.72rem !important;
     font-weight: 600;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    margin-bottom: 1rem;
-}
+    color: {INK2} !important;
+}}
 
-/* ── KPI Cards ── */
-.kpi-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 1rem;
-    margin-bottom: 1.8rem;
-}
-.kpi-card {
-    background: var(--card);
-    border: 1px solid var(--border);
+/* KPI cards */
+.kpi-card {{
+    background: {SURFACE};
+    border: 1px solid {BORDER};
     border-radius: 12px;
-    padding: 1.4rem 1.6rem;
+    padding: 18px 20px;
     position: relative;
     overflow: hidden;
-    transition: border-color 0.2s;
-}
-.kpi-card::before {
+    box-shadow: 0 1px 3px rgba(26,23,20,0.05), 0 4px 16px rgba(26,23,20,0.03);
+    transition: box-shadow 0.2s;
+}}
+.kpi-card:hover {{ box-shadow: 0 4px 12px rgba(26,23,20,0.09), 0 12px 28px rgba(26,23,20,0.05); }}
+.kpi-card::after {{
     content: '';
     position: absolute;
-    top: 0; left: 0; right: 0;
+    bottom: 0; left: 0; right: 0;
     height: 3px;
-    border-radius: 12px 12px 0 0;
-}
-.kpi-card.teal::before  { background: linear-gradient(90deg, var(--teal), var(--teal2)); }
-.kpi-card.gold::before  { background: linear-gradient(90deg, var(--gold), var(--coral)); }
-.kpi-card.mint::before  { background: linear-gradient(90deg, var(--mint), #34D399); }
-.kpi-card.rose::before  { background: linear-gradient(90deg, var(--rose), #FB7185); }
-.kpi-label {
-    font-size: 0.72rem;
-    color: var(--muted);
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
+    border-radius: 0 0 12px 12px;
+}}
+.kpi-card.accent::after  {{ background: {ACCENT}; }}
+.kpi-card.green::after   {{ background: {GREEN}; }}
+.kpi-card.blue::after    {{ background: {BLUE}; }}
+.kpi-card.gold::after    {{ background: {GOLD}; }}
+.kpi-label {{
+    font-size: 0.65rem;
     font-weight: 600;
-    margin-bottom: 0.5rem;
-}
-.kpi-value {
-    font-family: 'DM Serif Display', serif;
-    font-size: 2rem;
-    font-weight: 400;
-    color: var(--white);
-    line-height: 1;
-    margin-bottom: 0.35rem;
-}
-.kpi-delta {
-    font-size: 0.78rem;
-    color: var(--muted);
-}
-.kpi-delta .up   { color: var(--mint); }
-.kpi-delta .down { color: var(--rose); }
-
-/* ── Section Titles ── */
-.section-title {
-    font-family: 'DM Serif Display', serif;
-    font-size: 1.35rem;
-    color: var(--white);
-    margin: 0 0 0.25rem;
-}
-.section-sub {
-    font-size: 0.82rem;
-    color: var(--muted);
-    margin-bottom: 1.2rem;
-}
-
-/* ── Chart Cards ── */
-.chart-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 1.4rem;
-    margin-bottom: 1.2rem;
-}
-
-/* ── Insight Pills ── */
-.insight-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    background: rgba(14,165,201,0.1);
-    border: 1px solid rgba(14,165,201,0.2);
-    border-radius: 8px;
-    padding: 0.6rem 1rem;
-    font-size: 0.82rem;
-    color: var(--text);
-    margin: 0.3rem 0.3rem 0.3rem 0;
-    line-height: 1.4;
-}
-.insight-pill .icon { font-size: 1rem; }
-.insight-pill strong { color: var(--teal); }
-
-/* ── Tab Styling ── */
-.stTabs [data-baseweb="tab-list"] {
-    background: var(--navy2);
-    border-radius: 10px;
-    padding: 4px;
-    gap: 2px;
-    border: 1px solid var(--border);
-    margin-bottom: 1.2rem;
-}
-.stTabs [data-baseweb="tab"] {
-    background: transparent;
-    border-radius: 8px;
-    color: var(--muted) !important;
-    font-family: 'DM Sans', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: {INK2};
+    margin-bottom: 6px;
+}}
+.kpi-value {{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.7rem;
     font-weight: 500;
-    font-size: 0.85rem;
-    padding: 0.5rem 1.2rem;
-    border: none !important;
-}
-.stTabs [aria-selected="true"] {
-    background: var(--teal) !important;
-    color: var(--white) !important;
-}
+    color: {INK};
+    line-height: 1;
+    margin-bottom: 4px;
+}}
+.kpi-sub {{ font-size: 0.7rem; color: {INK2}; }}
+.kpi-sub b {{ color: {INK}; font-weight: 600; }}
 
-/* ── Filters ── */
-.stSelectbox label, .stMultiSelect label, .stSlider label { color: var(--muted) !important; font-size: 0.8rem !important; font-weight: 600 !important; letter-spacing: 0.05em; }
-div[data-baseweb="select"] > div { background: var(--card) !important; border-color: var(--border) !important; border-radius: 8px !important; color: var(--text) !important; }
-.stSlider .stSlider > div { color: var(--text) !important; }
+/* Insight pills */
+.insight-row {{ display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 1rem; }}
+.insight-pill {{
+    background: {SURFACE};
+    border: 1px solid {BORDER};
+    border-radius: 8px;
+    padding: 9px 14px;
+    font-size: 0.74rem;
+    color: {INK2};
+    flex: 1;
+    min-width: 170px;
+    line-height: 1.5;
+    box-shadow: 0 1px 3px rgba(26,23,20,0.04);
+}}
+.insight-pill b {{ color: {INK}; }}
+.insight-pill.accent {{ border-left: 3px solid {ACCENT}; }}
+.insight-pill.green  {{ border-left: 3px solid {GREEN}; }}
+.insight-pill.blue   {{ border-left: 3px solid {BLUE}; }}
+.insight-pill.gold   {{ border-left: 3px solid {GOLD}; }}
 
-/* ── Metric overrides ── */
-[data-testid="metric-container"] {
-    background: var(--card) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 12px !important;
-    padding: 1rem !important;
-}
+/* Chart cards */
+.chart-card {{
+    background: {SURFACE};
+    border: 1px solid {BORDER};
+    border-radius: 12px;
+    padding: 16px 18px 10px;
+    box-shadow: 0 1px 3px rgba(26,23,20,0.05), 0 4px 16px rgba(26,23,20,0.03);
+    margin-bottom: 14px;
+    transition: box-shadow 0.2s;
+}}
+.chart-card:hover {{ box-shadow: 0 4px 12px rgba(26,23,20,0.09); }}
+.chart-title {{
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: {INK};
+    margin-bottom: 2px;
+    letter-spacing: -0.01em;
+}}
+.chart-sub {{
+    font-size: 0.68rem;
+    color: {INK2};
+    margin-bottom: 10px;
+}}
 
-/* ── Table ── */
-.stDataFrame { border-radius: 10px; overflow: hidden; }
+/* Rank bars */
+.rank-row {{
+    display: grid;
+    grid-template-columns: 100px 1fr 55px;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 7px;
+    font-size: 0.74rem;
+}}
+.rank-name {{ color: {INK}; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+.rank-bar-bg {{ background: {CHIP_BG}; border-radius: 3px; height: 6px; overflow: hidden; }}
+.rank-bar {{ height: 100%; border-radius: 3px; }}
+.rank-val {{ font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: {INK2}; text-align: right; }}
 
-/* ── Scrollbar ── */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: var(--navy); }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+/* Tier pills */
+.pill {{ display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }}
+.pill-eco  {{ background: #DDEEDE; color: {GREEN}; }}
+.pill-mid  {{ background: #DDEAF5; color: {BLUE}; }}
+.pill-prem {{ background: #FFF0E0; color: {GOLD}; }}
+.pill-lux  {{ background: #FFE0E0; color: {ACCENT}; }}
 
-/* ── Divider ── */
-.fancy-divider {
-    height: 1px;
-    background: linear-gradient(90deg, transparent, var(--border), transparent);
-    margin: 1.8rem 0;
-}
-
-/* ── Rank badge ── */
-.rank-badge {
-    display: inline-block;
-    width: 24px; height: 24px;
-    border-radius: 50%;
-    background: var(--teal);
-    color: white;
-    font-size: 0.7rem;
+/* Header */
+.dash-header {{
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 1.2rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid {BORDER};
+}}
+.logo-eyebrow {{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: {ACCENT};
+    margin-bottom: 3px;
+}}
+.logo-title {{
+    font-size: 1.6rem;
     font-weight: 700;
-    text-align: center;
-    line-height: 24px;
-}
+    color: {INK};
+    letter-spacing: -0.03em;
+    line-height: 1;
+}}
+.logo-title span {{ color: {ACCENT}; }}
+.logo-sub {{ font-size: 0.76rem; color: {INK2}; margin-top: 3px; }}
+.hstats {{ display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }}
+.hstat-val {{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1rem;
+    font-weight: 500;
+    color: {INK};
+}}
+.hstat-label {{ font-size: 0.64rem; color: {INK2}; text-transform: uppercase; letter-spacing: 0.08em; }}
+.divider {{ height: 1px; background: {BORDER}; margin: 1rem 0; }}
+
+/* Dataframe */
+.stDataFrame {{ border-radius: 10px; overflow: hidden; }}
+
+/* Selectbox / slider */
+div[data-baseweb="select"] > div {{
+    background: {SURFACE} !important;
+    border-color: {BORDER} !important;
+    border-radius: 8px !important;
+}}
 </style>
 """, unsafe_allow_html=True)
 
-# ─────────────────────────────────────────────
-# LOAD DATA
-# ─────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────
+# DATA
+# ─────────────────────────────────────────────────────────────
 @st.cache_data
 def load_data():
     df = pd.read_csv("cleaned_car_sales_data.csv")
-    df["Latest_Launch"] = pd.to_datetime(df["Latest_Launch"], errors="coerce")
-    df["Launch_Year"]   = df["Latest_Launch"].dt.year
-    df["Launch_Month"]  = df["Latest_Launch"].dt.month
-    df["Resale_Ratio"]  = (df["__year_resale_value"] / df["Price_in_thousands"]).round(3)
+    df["Resale_Ratio"]  = df["__year_resale_value"] / df["Price_in_thousands"]
     df["Price_Segment"] = pd.cut(
         df["Price_in_thousands"],
-        bins=[0, 15, 25, 35, 60],
-        labels=["Economy (<$15K)", "Mid-Range ($15-25K)", "Premium ($25-35K)", "Luxury ($35K+)"]
+        bins=[0, 15, 25, 35, 100],
+        labels=["Economy", "Mid-Range", "Premium", "Luxury"],
     )
-    df["HP_Category"] = pd.cut(
-        df["Horsepower"],
-        bins=[0, 130, 180, 230, 400],
-        labels=["Low (<130)", "Mid (130-180)", "High (180-230)", "Sport (230+)"]
-    )
+    df["Latest_Launch"] = pd.to_datetime(df["Latest_Launch"], errors="coerce")
     return df
 
 df_raw = load_data()
 
-# ─────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────
 # SIDEBAR — FILTERS
-# ─────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("""
+    st.markdown(f"""
     <div style='text-align:center; padding: 1rem 0 1.5rem;'>
-        <div style='font-family: DM Serif Display, serif; font-size: 1.5rem; color: #0EA5C9;'>🚗 AutoInsight</div>
-        <div style='font-size: 0.72rem; color: #64748B; letter-spacing: 0.1em; text-transform: uppercase; margin-top: 0.2rem;'>Car Sales Intelligence</div>
+      <div style='font-family:JetBrains Mono,monospace; font-size:0.6rem; letter-spacing:0.14em; text-transform:uppercase; color:{ACCENT}; margin-bottom:4px;'>⬡ Portfolio Dashboard</div>
+      <div style='font-size:1.3rem; font-weight:700; color:{INK}; letter-spacing:-0.03em;'>Auto<span style="color:{ACCENT}">Insight</span></div>
+      <div style='font-size:0.7rem; color:{INK2}; margin-top:3px;'>Car Sales Intelligence</div>
     </div>
+    <hr style='border:none; border-top:1px solid {BORDER}; margin-bottom:1rem;'>
     """, unsafe_allow_html=True)
 
-    st.markdown("## 🎛️ Filters")
+    st.markdown("**SEGMENT**")
+    seg_opts  = ["All"] + list(df_raw["Price_Segment"].cat.categories)
+    sel_seg   = st.selectbox("", seg_opts, label_visibility="collapsed")
 
-    all_manufacturers = sorted(df_raw["Manufacturer"].unique())
-    selected_mfr = st.multiselect(
-        "MANUFACTURER",
-        options=all_manufacturers,
-        default=all_manufacturers,
-        placeholder="Select manufacturers..."
-    )
+    st.markdown("**VEHICLE TYPE**")
+    type_opts = ["All"] + sorted(df_raw["Vehicle_type"].unique())
+    sel_type  = st.selectbox(" ", type_opts, label_visibility="collapsed")
 
-    all_types = sorted(df_raw["Vehicle_type"].unique())
-    selected_type = st.multiselect(
-        "VEHICLE TYPE",
-        options=all_types,
-        default=all_types,
-    )
+    st.markdown("**MAX PRICE ($K)**")
+    price_max = st.slider("", 9, 53, 53, label_visibility="collapsed")
 
-    price_min, price_max = float(df_raw["Price_in_thousands"].min()), float(df_raw["Price_in_thousands"].max())
-    price_range = st.slider(
-        "PRICE RANGE ($K)",
-        min_value=price_min,
-        max_value=price_max,
-        value=(price_min, price_max),
-        step=0.5,
-    )
+    st.markdown("**MIN SALES (K UNITS)**")
+    min_sales = st.slider(" ", 0, 150, 0, label_visibility="collapsed")
 
-    hp_min, hp_max = float(df_raw["Horsepower"].min()), float(df_raw["Horsepower"].max())
-    hp_range = st.slider(
-        "HORSEPOWER",
-        min_value=hp_min,
-        max_value=hp_max,
-        value=(hp_min, hp_max),
-        step=5.0,
-    )
-
-    st.markdown("<div class='fancy-divider'></div>", unsafe_allow_html=True)
-    st.markdown("""
-    <div style='font-size:0.72rem; color:#64748B; text-align:center; line-height:1.8;'>
-        📊 Dataset: Cleaned Car Sales<br>
-        🗂️ 157 Models · 30 Manufacturers<br>
-        🛠️ Built with Streamlit + Plotly<br>
-        <span style='color:#0EA5C9;'>Aris Darya Fernanda</span>
-    </div>
-    """, unsafe_allow_html=True)
-
-# ─────────────────────────────────────────────
-# APPLY FILTERS
-# ─────────────────────────────────────────────
-df = df_raw.copy()
-if selected_mfr:
-    df = df[df["Manufacturer"].isin(selected_mfr)]
-if selected_type:
-    df = df[df["Vehicle_type"].isin(selected_type)]
-df = df[
-    (df["Price_in_thousands"] >= price_range[0]) &
-    (df["Price_in_thousands"] <= price_range[1]) &
-    (df["Horsepower"] >= hp_range[0]) &
-    (df["Horsepower"] <= hp_range[1])
-]
-
-n_filtered  = len(df)
-n_total     = len(df_raw)
-pct_showing = round(n_filtered / n_total * 100, 1) if n_total > 0 else 0
-
-# ─────────────────────────────────────────────
-# PLOTLY THEME
-# ─────────────────────────────────────────────
-PLOT_BG   = "rgba(0,0,0,0)"
-PAPER_BG  = "rgba(0,0,0,0)"
-FONT_CLR  = "#94A3B8"
-GRID_CLR  = "rgba(30,50,80,0.6)"
-TEAL      = "#0EA5C9"
-GOLD      = "#F59E0B"
-CORAL     = "#F97316"
-MINT      = "#10B981"
-ROSE      = "#F43F5E"
-PURPLE    = "#8B5CF6"
-
-PALETTE = [TEAL, GOLD, CORAL, MINT, ROSE, PURPLE,
-           "#06B6D4", "#FBBF24", "#FB923C", "#34D399",
-           "#FB7185", "#A78BFA", "#38BDF8", "#FCD34D"]
-
-def base_layout(**kwargs):
-    # Pop overridable defaults to prevent duplicate-key errors when
-    # callers pass the same key both inside base_layout() AND to update_layout().
-    margin = kwargs.pop("margin", dict(l=10, r=10, t=40, b=10))
-    legend = kwargs.pop("legend", dict(
-        bgcolor="rgba(14,36,58,0.8)",
-        bordercolor=GRID_CLR,
-        borderwidth=1,
-        font=dict(size=11),
-    ))
-    return dict(
-        paper_bgcolor=PAPER_BG,
-        plot_bgcolor=PLOT_BG,
-        font=dict(family="DM Sans, sans-serif", color=FONT_CLR, size=12),
-        margin=margin,
-        legend=legend,
-        **kwargs
-    )
-
-def style_axes(fig, showgrid_x=True, showgrid_y=True):
-    fig.update_xaxes(
-        gridcolor=GRID_CLR, gridwidth=0.5,
-        showgrid=showgrid_x, zeroline=False,
-        tickfont=dict(color=FONT_CLR, size=11),
-        linecolor=GRID_CLR,
-    )
-    fig.update_yaxes(
-        gridcolor=GRID_CLR, gridwidth=0.5,
-        showgrid=showgrid_y, zeroline=False,
-        tickfont=dict(color=FONT_CLR, size=11),
-        linecolor=GRID_CLR,
-    )
-    return fig
-
-def add_ols_trendline(fig, x_vals, y_vals, color="#FFFFFF", opacity=0.45, name="Trend"):
-    """Add a numpy-based OLS trendline — no statsmodels required."""
-    mask = ~(np.isnan(x_vals) | np.isnan(y_vals))
-    x_c, y_c = np.array(x_vals)[mask], np.array(y_vals)[mask]
-    if len(x_c) < 2:
-        return fig
-    m, b = np.polyfit(x_c, y_c, 1)
-    x_line = np.array([x_c.min(), x_c.max()])
-    y_line = m * x_line + b
-    fig.add_trace(go.Scatter(
-        x=x_line, y=y_line,
-        mode="lines",
-        line=dict(color=color, width=1.8, dash="solid"),
-        opacity=opacity,
-        name=name,
-        showlegend=False,
-        hoverinfo="skip",
-    ))
-    return fig
-
-def add_smooth_trendline(fig, x_vals, y_vals, color="#FFFFFF", opacity=0.55, name="Trend", n_points=60):
-    """Add a numpy-based smoothed trendline using polynomial fit — no statsmodels required."""
-    mask = ~(np.isnan(x_vals) | np.isnan(y_vals))
-    x_c, y_c = np.array(x_vals)[mask], np.array(y_vals)[mask]
-    if len(x_c) < 4:
-        return fig
-    sort_idx = np.argsort(x_c)
-    x_s, y_s = x_c[sort_idx], y_c[sort_idx]
-    # Degree-3 poly for smooth curve
-    coeffs = np.polyfit(x_s, y_s, 3)
-    x_line = np.linspace(x_s.min(), x_s.max(), n_points)
-    y_line = np.polyval(coeffs, x_line)
-    fig.add_trace(go.Scatter(
-        x=x_line, y=y_line,
-        mode="lines",
-        line=dict(color=color, width=2.2, dash="solid"),
-        opacity=opacity,
-        name=name,
-        showlegend=False,
-        hoverinfo="skip",
-    ))
-    return fig
-
-# ─────────────────────────────────────────────
-# HERO HEADER
-# ─────────────────────────────────────────────
-st.markdown(f"""
-<div class="hero-header">
-    <div class="hero-badge">📊 Data Analytics Portfolio</div>
-    <h1 class="hero-title">Auto<span>Insight</span> Dashboard</h1>
-    <p class="hero-sub">Interactive Intelligence Platform · Car Sales & Market Analysis · {n_filtered} of {n_total} models displayed ({pct_showing}%)</p>
-</div>
-""", unsafe_allow_html=True)
-
-# ─────────────────────────────────────────────
-# KPI CARDS
-# ─────────────────────────────────────────────
-total_sales    = df["Sales_in_thousands"].sum()
-avg_price      = df["Price_in_thousands"].mean()
-avg_hp         = df["Horsepower"].mean()
-avg_efficiency = df["Fuel_efficiency"].mean()
-avg_resale     = df["Resale_Ratio"].mean()
-
-# Compare to full dataset
-delta_sales = ((total_sales - df_raw["Sales_in_thousands"].sum()) / df_raw["Sales_in_thousands"].sum() * 100)
-delta_price = avg_price - df_raw["Price_in_thousands"].mean()
-
-st.markdown(f"""
-<div class="kpi-grid">
-    <div class="kpi-card teal">
-        <div class="kpi-label">Total Sales Volume</div>
-        <div class="kpi-value">{total_sales/1000:,.1f}M</div>
-        <div class="kpi-delta">units sold across <strong style='color:#E2E8F0'>{df['Manufacturer'].nunique()}</strong> brands</div>
-    </div>
-    <div class="kpi-card gold">
-        <div class="kpi-label">Avg. Sticker Price</div>
-        <div class="kpi-value">${avg_price:,.1f}K</div>
-        <div class="kpi-delta"><span class="{'up' if delta_price >= 0 else 'down'}">{'▲' if delta_price >= 0 else '▼'} ${abs(delta_price):.1f}K</span> vs all models</div>
-    </div>
-    <div class="kpi-card mint">
-        <div class="kpi-label">Avg. Horsepower</div>
-        <div class="kpi-value">{avg_hp:,.0f} hp</div>
-        <div class="kpi-delta">across <strong style='color:#E2E8F0'>{n_filtered}</strong> filtered models</div>
-    </div>
-    <div class="kpi-card rose">
-        <div class="kpi-label">Avg. Fuel Efficiency</div>
-        <div class="kpi-value">{avg_efficiency:.1f} mpg</div>
-        <div class="kpi-delta">resale ratio avg: <strong style='color:#E2E8F0'>{avg_resale:.2f}x</strong></div>
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
-# ─────────────────────────────────────────────
-# MAIN TABS
-# ─────────────────────────────────────────────
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "📈 Market Overview",
-    "🔍 Model Explorer",
-    "⚡ Performance Analysis",
-    "💰 Price & Value",
-    "📋 Data Table",
-])
-
-# ══════════════════════════════════════════════
-# TAB 1 — MARKET OVERVIEW
-# ══════════════════════════════════════════════
-with tab1:
-    col1, col2 = st.columns([3, 2])
-
-    with col1:
-        st.markdown('<p class="section-title">Top Manufacturers by Sales Volume</p>', unsafe_allow_html=True)
-        st.markdown('<p class="section-sub">Total units sold (thousands) — ranked & color-coded by performance tier</p>', unsafe_allow_html=True)
-
-        mfr_sales = (
-            df.groupby("Manufacturer")["Sales_in_thousands"]
-            .sum()
-            .sort_values(ascending=True)
-            .reset_index()
-        )
-        mfr_sales["rank"] = range(len(mfr_sales), 0, -1)
-
-        fig_mfr = go.Figure()
-        colors = [TEAL if v >= mfr_sales["Sales_in_thousands"].quantile(0.75)
-                  else (GOLD if v >= mfr_sales["Sales_in_thousands"].median()
-                  else FONT_CLR)
-                  for v in mfr_sales["Sales_in_thousands"]]
-
-        fig_mfr.add_trace(go.Bar(
-            x=mfr_sales["Sales_in_thousands"],
-            y=mfr_sales["Manufacturer"],
-            orientation="h",
-            marker=dict(color=colors, line=dict(width=0)),
-            text=[f"  {v:,.0f}K" for v in mfr_sales["Sales_in_thousands"]],
-            textposition="outside",
-            textfont=dict(size=10, color=FONT_CLR),
-            hovertemplate="<b>%{y}</b><br>Sales: %{x:,.0f}K units<extra></extra>",
-        ))
-        fig_mfr.update_layout(
-            **base_layout(height=460, title=None),
-            xaxis_title="Sales (thousands)",
-            yaxis_title=None,
-            showlegend=False,
-        )
-        style_axes(fig_mfr, showgrid_x=True, showgrid_y=False)
-        st.plotly_chart(fig_mfr, use_container_width=True)
-
-    with col2:
-        st.markdown('<p class="section-title">Market Share by Price Segment</p>', unsafe_allow_html=True)
-        st.markdown('<p class="section-sub">Volume distribution across price tiers</p>', unsafe_allow_html=True)
-
-        seg_sales = df.groupby("Price_Segment", observed=True)["Sales_in_thousands"].sum().reset_index()
-        seg_sales.columns = ["Segment", "Sales"]
-
-        fig_donut = go.Figure(go.Pie(
-            labels=seg_sales["Segment"],
-            values=seg_sales["Sales"],
-            hole=0.62,
-            marker=dict(colors=[TEAL, GOLD, CORAL, ROSE], line=dict(color="rgba(0,0,0,0)", width=0)),
-            textinfo="label+percent",
-            textfont=dict(size=11, color="#E2E8F0"),
-            hovertemplate="<b>%{label}</b><br>%{value:,.0f}K units<br>%{percent}<extra></extra>",
-            sort=False,
-        ))
-        fig_donut.add_annotation(
-            text=f"<b style='font-size:18px'>{seg_sales['Sales'].sum()/1000:,.1f}M</b><br><span style='font-size:11px; color:{FONT_CLR}'>Total Units</span>",
-            x=0.5, y=0.5, showarrow=False,
-            font=dict(color="#E2E8F0", size=14),
-            align="center",
-        )
-        fig_donut.update_layout(**base_layout(height=240, title=None, margin=dict(t=10, b=10, l=10, r=10)), showlegend=False)
-        st.plotly_chart(fig_donut, use_container_width=True)
-
-        st.markdown('<p class="section-title" style="margin-top:0.5rem">Vehicle Type Mix</p>', unsafe_allow_html=True)
-        type_sales = df.groupby("Vehicle_type")["Sales_in_thousands"].sum().reset_index()
-        fig_type = go.Figure(go.Pie(
-            labels=type_sales["Vehicle_type"],
-            values=type_sales["Sales_in_thousands"],
-            hole=0.55,
-            marker=dict(colors=[TEAL, MINT]),
-            textinfo="label+percent",
-            textfont=dict(size=11, color="#E2E8F0"),
-            hovertemplate="<b>%{label}</b><br>%{value:,.0f}K units<extra></extra>",
-        ))
-        fig_type.update_layout(**base_layout(height=175, title=None, margin=dict(t=5, b=5, l=10, r=10)), showlegend=False)
-        st.plotly_chart(fig_type, use_container_width=True)
-
-    # ── Row 2: Sales vs Price Scatter + Monthly Launch
-    st.markdown('<div class="fancy-divider"></div>', unsafe_allow_html=True)
-    col3, col4 = st.columns([3, 2])
-
-    with col3:
-        st.markdown('<p class="section-title">Sales Volume vs. Price — Bubble Map</p>', unsafe_allow_html=True)
-        st.markdown('<p class="section-sub">Bubble size = Horsepower · Color = Manufacturer · Hover for full detail</p>', unsafe_allow_html=True)
-
-        fig_bubble = px.scatter(
-            df,
-            x="Price_in_thousands",
-            y="Sales_in_thousands",
-            size="Horsepower",
-            color="Manufacturer",
-            hover_name="Model",
-            hover_data={"Manufacturer": True, "Price_in_thousands": ":.1f",
-                        "Sales_in_thousands": ":.1f", "Horsepower": ":.0f",
-                        "Fuel_efficiency": ":.1f"},
-            color_discrete_sequence=PALETTE,
-            size_max=28,
-            labels={
-                "Price_in_thousands": "Price ($K)",
-                "Sales_in_thousands": "Sales (K units)",
-                "Horsepower": "HP",
-            },
-        )
-        fig_bubble.update_traces(
-            marker=dict(opacity=0.75, line=dict(width=0.5, color="rgba(255,255,255,0.2)")),
-        )
-        fig_bubble.update_layout(**base_layout(height=380))
-        style_axes(fig_bubble)
-        st.plotly_chart(fig_bubble, use_container_width=True)
-
-    with col4:
-        st.markdown('<p class="section-title">Launch Activity by Year</p>', unsafe_allow_html=True)
-        st.markdown('<p class="section-sub">Model launches and cumulative sales</p>', unsafe_allow_html=True)
-
-        year_df = df.groupby("Launch_Year").agg(
-            Models=("Model", "count"),
-            Sales=("Sales_in_thousands", "sum")
-        ).reset_index().dropna()
-
-        fig_year = make_subplots(specs=[[{"secondary_y": True}]])
-        fig_year.add_trace(go.Bar(
-            x=year_df["Launch_Year"], y=year_df["Models"],
-            name="# Models", marker_color=TEAL, opacity=0.7,
-            hovertemplate="%{x}: %{y} models<extra></extra>",
-        ), secondary_y=False)
-        fig_year.add_trace(go.Scatter(
-            x=year_df["Launch_Year"], y=year_df["Sales"],
-            name="Sales (K)", line=dict(color=GOLD, width=2.5),
-            mode="lines+markers",
-            marker=dict(size=6, color=GOLD),
-            hovertemplate="%{x}: %{y:,.0f}K units<extra></extra>",
-        ), secondary_y=True)
-        fig_year.update_layout(
-            **base_layout(height=380, legend=dict(x=0.02, y=0.98, font=dict(size=10))),
-        )
-        fig_year.update_yaxes(gridcolor=GRID_CLR, zeroline=False, tickfont=dict(color=FONT_CLR, size=11))
-        fig_year.update_xaxes(gridcolor=GRID_CLR, zeroline=False, tickfont=dict(color=FONT_CLR, size=11))
-        st.plotly_chart(fig_year, use_container_width=True)
-
-    # ── Key Insights
-    st.markdown('<div class="fancy-divider"></div>', unsafe_allow_html=True)
-    st.markdown('<p class="section-title">📌 Auto-Generated Insights</p>', unsafe_allow_html=True)
-
-    top_mfr    = df.groupby("Manufacturer")["Sales_in_thousands"].sum().idxmax()
-    top_model  = df.loc[df["Sales_in_thousands"].idxmax(), "Model"]
-    top_sales  = df["Sales_in_thousands"].max()
-    neg_corr   = round(df["Sales_in_thousands"].corr(df["Price_in_thousands"]), 3)
-    best_mpg   = df.loc[df["Fuel_efficiency"].idxmax()]
-    top_seg    = seg_sales.loc[seg_sales["Sales"].idxmax(), "Segment"]
+    st.markdown("**MANUFACTURER**")
+    all_mfrs   = sorted(df_raw["Manufacturer"].unique())
+    sel_mfrs   = st.multiselect("", all_mfrs, default=all_mfrs, label_visibility="collapsed")
 
     st.markdown(f"""
-    <div style='display:flex; flex-wrap:wrap; gap:0.3rem; margin-top:0.5rem;'>
-        <div class='insight-pill'><span class='icon'>🏆</span><span><strong>{top_mfr}</strong> leads with the highest total sales volume in the current filter.</span></div>
-        <div class='insight-pill'><span class='icon'>⭐</span><span>Best-selling single model: <strong>{top_model}</strong> with <strong>{top_sales:,.1f}K units</strong>.</span></div>
-        <div class='insight-pill'><span class='icon'>📉</span><span>Price vs Sales correlation: <strong>{neg_corr}</strong> — higher-priced cars sell significantly fewer units.</span></div>
-        <div class='insight-pill'><span class='icon'>🌿</span><span>Most fuel-efficient model: <strong>{best_mpg['Model']}</strong> ({best_mpg['Manufacturer']}) at <strong>{best_mpg['Fuel_efficiency']:.1f} mpg</strong>.</span></div>
-        <div class='insight-pill'><span class='icon'>💼</span><span>Dominant segment by volume: <strong>{top_seg}</strong> — where mass-market demand is concentrated.</span></div>
+    <hr style='border:none; border-top:1px solid {BORDER}; margin-top:1rem;'>
+    <div style='font-size:0.65rem; color:{INK2}; text-align:center; line-height:2; margin-top:0.8rem;'>
+      📊 157 Models · 30 Manufacturers<br>
+      🛠️ Streamlit + Plotly · Pure NumPy<br>
+      <span style='color:{ACCENT}; font-family:JetBrains Mono,monospace;'>Aris Darya Fernanda</span>
     </div>
     """, unsafe_allow_html=True)
 
+# ─────────────────────────────────────────────────────────────
+# FILTER DATA
+# ─────────────────────────────────────────────────────────────
+df = df_raw.copy()
+if sel_seg  != "All": df = df[df["Price_Segment"] == sel_seg]
+if sel_type != "All": df = df[df["Vehicle_type"]  == sel_type]
+if sel_mfrs:          df = df[df["Manufacturer"].isin(sel_mfrs)]
+df = df[df["Price_in_thousands"]  <= price_max]
+df = df[df["Sales_in_thousands"]  >= min_sales]
 
-# ══════════════════════════════════════════════
-# TAB 2 — MODEL EXPLORER
-# ══════════════════════════════════════════════
-with tab2:
-    st.markdown('<p class="section-title">🔍 Interactive Model Explorer</p>', unsafe_allow_html=True)
-    st.markdown('<p class="section-sub">Drill down into individual models — compare specs, rank by any metric</p>', unsafe_allow_html=True)
+n       = len(df)
+n_total = len(df_raw)
 
-    col_l, col_r = st.columns([1, 3])
-    with col_l:
-        x_metric = st.selectbox("X-AXIS METRIC", [
-            "Price_in_thousands", "Horsepower", "Fuel_efficiency",
-            "Engine_size", "Curb_weight", "Power_perf_factor"
-        ], index=0, format_func=lambda x: x.replace("_", " ").title())
+# Guard: empty state
+if n == 0:
+    st.warning("⚠️ No data matches the current filters. Try relaxing your selections.")
+    st.stop()
 
-        y_metric = st.selectbox("Y-AXIS METRIC", [
-            "Sales_in_thousands", "Horsepower", "__year_resale_value",
-            "Fuel_efficiency", "Power_perf_factor", "Resale_Ratio"
-        ], index=0, format_func=lambda x: x.replace("_", " ").replace("__", "").title())
+# ─────────────────────────────────────────────────────────────
+# COMPUTED STATS
+# ─────────────────────────────────────────────────────────────
+total_sales = df["Sales_in_thousands"].sum()
+avg_price   = df["Price_in_thousands"].mean()
+avg_hp      = df["Horsepower"].mean()
+avg_mpg     = df["Fuel_efficiency"].mean()
+avg_resale  = df["Resale_Ratio"].mean()
+n_brands    = df["Manufacturer"].nunique()
 
-        color_by = st.selectbox("COLOR BY", ["Manufacturer", "Vehicle_type", "Price_Segment", "HP_Category"])
-        show_trendline = st.checkbox("Show Trendline", value=True)
+top_brand   = df.groupby("Manufacturer")["Sales_in_thousands"].sum().idxmax()
+top_model   = df.loc[df["Sales_in_thousands"].idxmax()]
+best_mpg    = df.loc[df["Fuel_efficiency"].idxmax()]
+most_hp     = df.loc[df["Horsepower"].idxmax()]
 
-    with col_r:
-        fig_exp = px.scatter(
-            df,
-            x=x_metric,
-            y=y_metric,
-            color=color_by,
-            hover_name="Model",
-            hover_data={"Manufacturer": True, "Price_in_thousands": ":.1f",
-                        "Sales_in_thousands": ":.1f", "Horsepower": ":.0f"},
-            color_discrete_sequence=PALETTE,
-            labels={
-                x_metric: x_metric.replace("_", " ").replace("__", "").title(),
-                y_metric: y_metric.replace("_", " ").replace("__", "").title(),
-            },
-            size_max=12,
-        )
-        fig_exp.update_traces(
-            selector=dict(mode="markers"),
-            marker=dict(size=9, opacity=0.8, line=dict(width=0.5, color="rgba(255,255,255,0.2)")),
-        )
-        if show_trendline:
-            add_ols_trendline(fig_exp, df[x_metric], df[y_metric], color=TEAL, opacity=0.6, name="Trend")
-        fig_exp.update_layout(**base_layout(height=430))
-        style_axes(fig_exp)
-        st.plotly_chart(fig_exp, use_container_width=True)
+# ─────────────────────────────────────────────────────────────
+# HEADER
+# ─────────────────────────────────────────────────────────────
+st.markdown(f"""
+<div class="dash-header">
+  <div>
+    <div class="logo-eyebrow">⬡ Portfolio Dashboard</div>
+    <div class="logo-title">Auto<span>Insight</span></div>
+    <div class="logo-sub">Car Sales Market Intelligence · {n} of {n_total} models · {n_brands} brands</div>
+  </div>
+  <div class="hstats">
+    <div>
+      <div class="hstat-val">{total_sales/1000:.1f}M</div>
+      <div class="hstat-label">Total Units</div>
+    </div>
+    <div>
+      <div class="hstat-val">${avg_price:.1f}K</div>
+      <div class="hstat-label">Avg. Price</div>
+    </div>
+    <div>
+      <div class="hstat-val">{avg_hp:.0f} hp</div>
+      <div class="hstat-label">Avg. Power</div>
+    </div>
+    <div>
+      <div class="hstat-val">{avg_mpg:.1f} mpg</div>
+      <div class="hstat-label">Avg. MPG</div>
+    </div>
+    <div>
+      <div class="hstat-val">{avg_resale:.2f}x</div>
+      <div class="hstat-label">Avg. Resale</div>
+    </div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
-    st.markdown('<div class="fancy-divider"></div>', unsafe_allow_html=True)
+# ─────────────────────────────────────────────────────────────
+# KPI CARDS
+# ─────────────────────────────────────────────────────────────
+k1, k2, k3, k4 = st.columns(4)
 
-    # ── Top / Bottom 10 Rankings
-    col_rank1, col_rank2 = st.columns(2)
+def kpi_card(col, color_cls, label, value, sub):
+    col.markdown(f"""
+    <div class="kpi-card {color_cls}">
+      <div class="kpi-label">{label}</div>
+      <div class="kpi-value">{value}</div>
+      <div class="kpi-sub">{sub}</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-    with col_rank1:
-        st.markdown('<p class="section-title">🥇 Top 10 — Sales Champions</p>', unsafe_allow_html=True)
-        top10 = (df.nlargest(10, "Sales_in_thousands")
-                 [["Manufacturer","Model","Sales_in_thousands","Price_in_thousands","Horsepower"]]
-                 .reset_index(drop=True))
-        top10.index += 1
-        top10.columns = ["Brand", "Model", "Sales (K)", "Price ($K)", "HP"]
-        top10["Sales (K)"] = top10["Sales (K)"].round(1)
-        top10["Price ($K)"] = top10["Price ($K)"].round(1)
-        top10["HP"] = top10["HP"].round(0).astype(int)
+kpi_card(k1, "accent", "Total Sales Volume",
+         f"{total_sales/1000:.1f}M",
+         f"units · <b>{n}</b> models · <b>{n_brands}</b> brands")
 
-        fig_top = go.Figure(go.Bar(
-            x=top10["Sales (K)"][::-1],
-            y=[f"{r}. {b} {m}" for r, b, m in zip(top10.index[::-1], top10["Brand"][::-1], top10["Model"][::-1])],
-            orientation="h",
-            marker=dict(
-                color=top10["Sales (K)"][::-1],
-                colorscale=[[0, "rgba(14,165,201,0.4)"], [1, TEAL]],
-                showscale=False,
-            ),
-            text=[f"  {v:.1f}K" for v in top10["Sales (K)"][::-1]],
-            textposition="outside", textfont=dict(size=10, color=FONT_CLR),
-            hovertemplate="<b>%{y}</b><br>Sales: %{x:.1f}K<extra></extra>",
-        ))
-        fig_top.update_layout(**base_layout(height=320, margin=dict(l=120, r=40, t=15, b=10)), showlegend=False)
-        style_axes(fig_top, showgrid_y=False)
-        st.plotly_chart(fig_top, use_container_width=True)
+kpi_card(k2, "green", "Models Displayed",
+         str(n),
+         f"of <b>{n_total}</b> total models")
 
-    with col_rank2:
-        st.markdown('<p class="section-title">💡 Top 10 — Most Powerful</p>', unsafe_allow_html=True)
-        top10_hp = (df.nlargest(10, "Horsepower")
-                    [["Manufacturer","Model","Horsepower","Price_in_thousands","Sales_in_thousands"]]
-                    .reset_index(drop=True))
+kpi_card(k3, "blue", "Avg. Sticker Price",
+         f"${avg_price:.1f}K",
+         f"avg HP: <b>{avg_hp:.0f}</b>")
 
-        fig_hp = go.Figure(go.Bar(
-            x=top10_hp["Horsepower"][::-1],
-            y=[f"{b} {m}" for b, m in zip(top10_hp["Manufacturer"][::-1], top10_hp["Model"][::-1])],
-            orientation="h",
-            marker=dict(
-                color=top10_hp["Horsepower"][::-1],
-                colorscale=[[0, "rgba(249,115,22,0.4)"], [1, CORAL]],
-                showscale=False,
-            ),
-            text=[f"  {v:.0f} hp" for v in top10_hp["Horsepower"][::-1]],
-            textposition="outside", textfont=dict(size=10, color=FONT_CLR),
-            hovertemplate="<b>%{y}</b><br>HP: %{x:.0f}<extra></extra>",
-        ))
-        fig_hp.update_layout(**base_layout(height=320, margin=dict(l=120, r=40, t=15, b=10)), showlegend=False)
-        style_axes(fig_hp, showgrid_y=False)
-        st.plotly_chart(fig_hp, use_container_width=True)
+kpi_card(k4, "gold", "Avg. Fuel Efficiency",
+         f"{avg_mpg:.1f} mpg",
+         f"resale retention: <b>{avg_resale*100:.1f}%</b>")
 
-    # Manufacturer deep-dive
-    st.markdown('<div class="fancy-divider"></div>', unsafe_allow_html=True)
-    st.markdown('<p class="section-title">🏭 Manufacturer Deep-Dive</p>', unsafe_allow_html=True)
-    st.markdown('<p class="section-sub">Select a manufacturer to explore their full model lineup</p>', unsafe_allow_html=True)
+st.markdown("<div style='margin-bottom:1rem'></div>", unsafe_allow_html=True)
 
-    sel_mfr = st.selectbox("SELECT MANUFACTURER", sorted(df["Manufacturer"].unique()), label_visibility="collapsed")
-    mfr_df  = df[df["Manufacturer"] == sel_mfr].sort_values("Sales_in_thousands", ascending=False)
+# ─────────────────────────────────────────────────────────────
+# INSIGHT PILLS
+# ─────────────────────────────────────────────────────────────
+st.markdown(f"""
+<div class="insight-row">
+  <div class="insight-pill accent">🏆 <b>Top Brand:</b> {top_brand} with {df.groupby("Manufacturer")["Sales_in_thousands"].sum()[top_brand]:,.0f}K units</div>
+  <div class="insight-pill green">⭐ <b>Best Seller:</b> {top_model.Manufacturer} {top_model.Model} ({top_model.Sales_in_thousands:.1f}K units)</div>
+  <div class="insight-pill blue">🌿 <b>Best MPG:</b> {best_mpg.Manufacturer} {best_mpg.Model} at {best_mpg.Fuel_efficiency:.1f} mpg</div>
+  <div class="insight-pill gold">⚡ <b>Most Powerful:</b> {most_hp.Manufacturer} {most_hp.Model} with {most_hp.Horsepower:.0f} hp</div>
+</div>
+""", unsafe_allow_html=True)
 
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Models in Lineup", len(mfr_df))
-    m2.metric("Total Sales (K)", f"{mfr_df['Sales_in_thousands'].sum():,.1f}")
-    m3.metric("Avg Price ($K)", f"{mfr_df['Price_in_thousands'].mean():.1f}")
-    m4.metric("Avg Horsepower", f"{mfr_df['Horsepower'].mean():.0f} hp")
+# ─────────────────────────────────────────────────────────────
+# ROW 1 — Brand bar + Segment donut
+# ─────────────────────────────────────────────────────────────
+col_left, col_right = st.columns([3, 2])
 
-    fig_mfr_detail = px.bar(
-        mfr_df,
-        x="Model",
-        y="Sales_in_thousands",
-        color="Price_Segment",
-        color_discrete_map={
-            "Economy (<$15K)": TEAL,
-            "Mid-Range ($15-25K)": GOLD,
-            "Premium ($25-35K)": CORAL,
-            "Luxury ($35K+)": ROSE,
-        },
-        hover_data={"Price_in_thousands":":.1f", "Horsepower":":.0f",
-                    "Fuel_efficiency":":.1f", "Sales_in_thousands":":.1f"},
-        labels={"Sales_in_thousands": "Sales (K)", "Model": ""},
+with col_left:
+    st.markdown('<div class="chart-card">', unsafe_allow_html=True)
+    st.markdown('<div class="chart-title">Sales by Manufacturer</div>', unsafe_allow_html=True)
+    st.markdown('<div class="chart-sub">Total units sold (K) — top 12 by volume</div>', unsafe_allow_html=True)
+
+    brand_df = (
+        df.groupby("Manufacturer")["Sales_in_thousands"]
+        .sum().sort_values().tail(12).reset_index()
     )
-    fig_mfr_detail.update_layout(**base_layout(height=280), title=None)
-    style_axes(fig_mfr_detail, showgrid_x=False)
-    st.plotly_chart(fig_mfr_detail, use_container_width=True)
+    colors_bar = [MFR_PALETTE[i % len(MFR_PALETTE)] for i in range(len(brand_df))]
 
+    fig_brand = go.Figure(go.Bar(
+        x=brand_df["Sales_in_thousands"],
+        y=brand_df["Manufacturer"],
+        orientation="h",
+        marker=dict(color=colors_bar, line=dict(width=0)),
+        text=[f" {v:,.0f}K" for v in brand_df["Sales_in_thousands"]],
+        textposition="outside",
+        textfont=dict(size=10, color=INK2),
+        hovertemplate="<b>%{y}</b><br>Sales: %{x:,.0f}K units<extra></extra>",
+    ))
+    fig_brand.update_layout(**plot_layout(height=340, margin=dict(l=8, r=50, t=10, b=8)))
+    style_axes(fig_brand, show_xgrid=True, show_ygrid=False)
+    st.plotly_chart(fig_brand, use_container_width=True, config={"displayModeBar": False})
+    st.markdown('</div>', unsafe_allow_html=True)
 
-# ══════════════════════════════════════════════
-# TAB 3 — PERFORMANCE ANALYSIS
-# ══════════════════════════════════════════════
-with tab3:
-    st.markdown('<p class="section-title">⚡ Performance & Engineering Analysis</p>', unsafe_allow_html=True)
-    st.markdown('<p class="section-sub">Horsepower, engine specs, efficiency, and the performance-price tradeoff</p>', unsafe_allow_html=True)
+with col_right:
+    st.markdown('<div class="chart-card">', unsafe_allow_html=True)
+    st.markdown('<div class="chart-title">Market by Segment</div>', unsafe_allow_html=True)
+    st.markdown('<div class="chart-sub">Volume share across price tiers</div>', unsafe_allow_html=True)
 
-    col1, col2 = st.columns(2)
+    segs     = ["Economy", "Mid-Range", "Premium", "Luxury"]
+    seg_vals = [df[df["Price_Segment"] == s]["Sales_in_thousands"].sum() for s in segs]
 
-    with col1:
-        # HP Distribution by Segment
-        fig_violin = go.Figure()
-        segments = df["Price_Segment"].cat.categories
-        colors_v  = [TEAL, GOLD, CORAL, ROSE]
-        for seg, clr in zip(segments, colors_v):
-            sub = df[df["Price_Segment"] == seg]["Horsepower"].dropna()
-            if len(sub) > 0:
-                fig_violin.add_trace(go.Violin(
-                    y=sub, name=str(seg),
-                    line_color=clr, fillcolor=clr.replace(")", ",0.15)").replace("#", "rgba(").replace("rgba(0", "rgba(0"),
-                    meanline_visible=True, box_visible=True,
-                    hovertemplate=f"<b>{seg}</b><br>HP: %{{y:.0f}}<extra></extra>",
-                ))
-        fig_violin.update_layout(
-            **base_layout(height=360, title="Horsepower Distribution by Price Segment"),
-            showlegend=True, violinmode="overlay",
-        )
-        style_axes(fig_violin, showgrid_x=False)
-        st.plotly_chart(fig_violin, use_container_width=True)
+    fig_seg = go.Figure(go.Pie(
+        labels=segs,
+        values=seg_vals,
+        hole=0.62,
+        marker=dict(colors=SEG_COLORS, line=dict(color=SURFACE, width=3)),
+        textinfo="label+percent",
+        textfont=dict(size=11, color=INK),
+        hovertemplate="<b>%{label}</b><br>%{value:,.0f}K units<br>%{percent}<extra></extra>",
+        sort=False,
+    ))
+    total_seg = sum(seg_vals)
+    fig_seg.add_annotation(
+        text=f"<b>{total_seg/1000:.1f}M</b><br><span style='font-size:10px'>units</span>",
+        x=0.5, y=0.5, showarrow=False,
+        font=dict(color=INK, size=14), align="center",
+    )
+    fig_seg.update_layout(
+        **plot_layout(height=340, margin=dict(l=8, r=8, t=10, b=8)),
+        showlegend=True,
+        legend=dict(
+            orientation="v", x=1.02, y=0.5,
+            font=dict(size=10, color=INK2),
+            bgcolor="rgba(0,0,0,0)",
+        ),
+    )
+    st.plotly_chart(fig_seg, use_container_width=True, config={"displayModeBar": False})
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    with col2:
-        # Engine Size vs HP
-        _eng_df = df.dropna(subset=["Engine_size","Horsepower"])
-        fig_eng = px.scatter(
-            _eng_df,
-            x="Engine_size", y="Horsepower",
-            color="Price_Segment",
-            size="Sales_in_thousands",
-            hover_name="Model",
-            hover_data={"Manufacturer": True, "Engine_size": ":.1f", "Horsepower": ":.0f"},
-            color_discrete_map={
-                "Economy (<$15K)": TEAL, "Mid-Range ($15-25K)": GOLD,
-                "Premium ($25-35K)": CORAL, "Luxury ($35K+)": ROSE,
-            },
-            labels={"Engine_size": "Engine Size (L)", "Horsepower": "Horsepower"},
-            title="Engine Size vs Horsepower",
-        )
-        add_ols_trendline(fig_eng, _eng_df["Engine_size"], _eng_df["Horsepower"], color=MINT, opacity=0.55)
-        fig_eng.update_traces(
-            selector=dict(mode="markers"),
-            marker=dict(opacity=0.75, line=dict(width=0.5, color="rgba(255,255,255,0.15)"))
-        )
-        fig_eng.update_layout(**base_layout(height=360))
-        style_axes(fig_eng)
-        st.plotly_chart(fig_eng, use_container_width=True)
+# ─────────────────────────────────────────────────────────────
+# ROW 2 — Top models rank + Scatter price/sales + HP vs MPG
+# ─────────────────────────────────────────────────────────────
+c1, c2, c3 = st.columns(3)
 
-    col3, col4 = st.columns(2)
+# ── Top models rank
+with c1:
+    st.markdown('<div class="chart-card" style="height:330px">', unsafe_allow_html=True)
+    st.markdown('<div class="chart-title">Top Models by Sales</div>', unsafe_allow_html=True)
+    st.markdown('<div class="chart-sub">Units (K) — top 8</div>', unsafe_allow_html=True)
 
-    with col3:
-        # Fuel Efficiency vs HP colored by price segment
-        fig_eff = px.scatter(
-            df,
-            x="Horsepower", y="Fuel_efficiency",
-            color="Manufacturer",
-            hover_name="Model",
-            color_discrete_sequence=PALETTE,
-            labels={"Horsepower": "Horsepower", "Fuel_efficiency": "Fuel Efficiency (mpg)"},
-            title="Horsepower vs Fuel Efficiency",
-        )
-        add_smooth_trendline(fig_eff, df["Horsepower"], df["Fuel_efficiency"], color=GOLD, opacity=0.65)
-        fig_eff.update_traces(
-            selector=dict(mode="markers"),
-            marker=dict(size=8, opacity=0.75, line=dict(width=0.4, color="rgba(255,255,255,0.1)"))
-        )
-        fig_eff.update_layout(**base_layout(height=340))
-        style_axes(fig_eff)
-        st.plotly_chart(fig_eff, use_container_width=True)
+    top8  = df.nlargest(8, "Sales_in_thousands")
+    max_v = top8["Sales_in_thousands"].max()
+    rank_colors = [ACCENT, BLUE, GREEN, GOLD, "#6B1A4A", "#4A6B1A", "#1A6B6B", "#6B4A1A"]
 
-    with col4:
-        # Power-Performance-Factor Ranking — Top 15
-        ppf_top = df.nlargest(15, "Power_perf_factor")[["Manufacturer","Model","Power_perf_factor","Price_in_thousands"]].reset_index(drop=True)
-        fig_ppf = px.bar(
-            ppf_top.sort_values("Power_perf_factor"),
-            x="Power_perf_factor",
-            y=ppf_top.sort_values("Power_perf_factor").apply(lambda r: f"{r['Manufacturer']} {r['Model']}", axis=1),
-            orientation="h",
-            color="Price_in_thousands",
-            color_continuous_scale=[[0, TEAL], [0.5, GOLD], [1, ROSE]],
-            labels={"Power_perf_factor": "Power-Perf Factor", "color": "Price ($K)"},
-            title="Top 15 by Power-Performance Factor",
-        )
-        fig_ppf.update_coloraxes(colorbar=dict(
-            thickness=10, len=0.7,
-            tickfont=dict(color=FONT_CLR, size=10),
-            title=dict(text="Price $K", font=dict(color=FONT_CLR, size=10))
+    bars_html = ""
+    for i, (_, row) in enumerate(top8.iterrows()):
+        pct = row["Sales_in_thousands"] / max_v * 100
+        clr = rank_colors[i % len(rank_colors)]
+        bars_html += f"""
+        <div class="rank-row">
+          <span class="rank-name" title="{row.Manufacturer} {row.Model}">{row.Manufacturer} <span style='color:{INK2};font-weight:400'>{row.Model}</span></span>
+          <div class="rank-bar-bg"><div class="rank-bar" style="width:{pct:.1f}%;background:{clr}"></div></div>
+          <span class="rank-val">{row.Sales_in_thousands:.1f}</span>
+        </div>"""
+    st.markdown(bars_html, unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ── Scatter: Price vs Sales
+with c2:
+    st.markdown('<div class="chart-card">', unsafe_allow_html=True)
+    st.markdown('<div class="chart-title">Price vs Sales</div>', unsafe_allow_html=True)
+    st.markdown('<div class="chart-sub">Bubble size = Horsepower · Color = Tier</div>', unsafe_allow_html=True)
+
+    seg_color_map = {"Economy": BLUE, "Mid-Range": GOLD, "Premium": ACCENT, "Luxury": GREEN}
+    fig_scat = go.Figure()
+
+    for seg, clr in seg_color_map.items():
+        sub = df[df["Price_Segment"] == seg]
+        if len(sub) == 0:
+            continue
+        fig_scat.add_trace(go.Scatter(
+            x=sub["Price_in_thousands"],
+            y=sub["Sales_in_thousands"],
+            mode="markers",
+            name=str(seg),
+            marker=dict(
+                size=np.sqrt(sub["Horsepower"]) * 0.85,
+                color=clr + "99",
+                line=dict(color=clr, width=1),
+            ),
+            hovertemplate="<b>%{customdata[0]} %{customdata[1]}</b><br>Price: $%{x:.1f}K<br>Sales: %{y:.1f}K units<extra></extra>",
+            customdata=sub[["Manufacturer", "Model"]].values,
         ))
-        fig_ppf.update_layout(**base_layout(height=340, margin=dict(l=140, r=20, t=40, b=10)))
-        style_axes(fig_ppf, showgrid_y=False)
-        st.plotly_chart(fig_ppf, use_container_width=True)
 
-    # Correlation Heatmap
-    st.markdown('<div class="fancy-divider"></div>', unsafe_allow_html=True)
-    st.markdown('<p class="section-title">🧮 Correlation Matrix</p>', unsafe_allow_html=True)
-    st.markdown('<p class="section-sub">Pearson correlations between all numeric features — darker = stronger relationship</p>', unsafe_allow_html=True)
+    # OLS trendline
+    xl, yl = ols_line(df["Price_in_thousands"], df["Sales_in_thousands"])
+    if xl:
+        fig_scat.add_trace(go.Scatter(
+            x=xl, y=yl, mode="lines",
+            line=dict(color=ACCENT + "66", width=1.8, dash="dot"),
+            showlegend=False, hoverinfo="skip",
+        ))
 
-    num_cols = ["Sales_in_thousands","Price_in_thousands","Engine_size","Horsepower",
-                "Wheelbase","Width","Length","Curb_weight","Fuel_capacity",
-                "Fuel_efficiency","Power_perf_factor","Resale_Ratio"]
-    corr_df  = df[num_cols].corr().round(2)
-    labels_clean = [c.replace("_in_thousands","").replace("_"," ").title() for c in num_cols]
+    fig_scat.update_layout(
+        **plot_layout(height=290, margin=dict(l=8, r=8, t=10, b=8)),
+        showlegend=True,
+        legend=dict(
+            orientation="h", x=0, y=1.08,
+            font=dict(size=9, color=INK2),
+            bgcolor="rgba(0,0,0,0)",
+        ),
+    )
+    style_axes(fig_scat, x_title="Price ($K)", y_title="Sales (K)")
+    st.plotly_chart(fig_scat, use_container_width=True, config={"displayModeBar": False})
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ── HP vs MPG
+with c3:
+    st.markdown('<div class="chart-card">', unsafe_allow_html=True)
+    st.markdown('<div class="chart-title">Horsepower vs MPG</div>', unsafe_allow_html=True)
+    st.markdown('<div class="chart-sub">Efficiency tradeoff · Dashed = trend</div>', unsafe_allow_html=True)
+
+    fig_eff = go.Figure()
+
+    for seg, clr in seg_color_map.items():
+        sub = df[df["Price_Segment"] == seg]
+        if len(sub) == 0:
+            continue
+        fig_eff.add_trace(go.Scatter(
+            x=sub["Horsepower"],
+            y=sub["Fuel_efficiency"],
+            mode="markers",
+            name=str(seg),
+            marker=dict(size=7, color=clr + "88", line=dict(color=clr, width=0.8)),
+            hovertemplate="<b>%{customdata[0]} %{customdata[1]}</b><br>%{x:.0f} hp · %{y:.1f} mpg<extra></extra>",
+            customdata=sub[["Manufacturer", "Model"]].values,
+        ))
+
+    # OLS trendline (numpy, no statsmodels)
+    xl, yl = ols_line(df["Horsepower"], df["Fuel_efficiency"])
+    if xl:
+        fig_eff.add_trace(go.Scatter(
+            x=xl, y=yl, mode="lines",
+            line=dict(color=ACCENT + "66", width=1.8, dash="dot"),
+            showlegend=False, hoverinfo="skip",
+        ))
+
+    fig_eff.update_layout(
+        **plot_layout(height=290, margin=dict(l=8, r=8, t=10, b=8)),
+        showlegend=False,
+    )
+    style_axes(fig_eff, x_title="Horsepower", y_title="MPG")
+    st.plotly_chart(fig_eff, use_container_width=True, config={"displayModeBar": False})
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ─────────────────────────────────────────────────────────────
+# ROW 3 — Resale bar + Correlation heatmap
+# ─────────────────────────────────────────────────────────────
+r3a, r3b = st.columns([1, 2])
+
+with r3a:
+    st.markdown('<div class="chart-card">', unsafe_allow_html=True)
+    st.markdown('<div class="chart-title">Best Resale Retention</div>', unsafe_allow_html=True)
+    st.markdown('<div class="chart-sub">Resale value / original price (top 8)</div>', unsafe_allow_html=True)
+
+    top_resale = df.nlargest(8, "Resale_Ratio")[["Manufacturer", "Model", "Resale_Ratio", "Price_in_thousands"]]
+    top_resale = top_resale.sort_values("Resale_Ratio")
+
+    bar_colors = [GREEN if v >= 0.7 else (GOLD if v >= 0.55 else ACCENT)
+                  for v in top_resale["Resale_Ratio"]]
+
+    fig_res = go.Figure(go.Bar(
+        x=top_resale["Resale_Ratio"] * 100,
+        y=top_resale.apply(lambda r: f"{r.Manufacturer} {r.Model}", axis=1),
+        orientation="h",
+        marker=dict(color=[c + "CC" for c in bar_colors], line=dict(width=0)),
+        text=[f" {v*100:.1f}%" for v in top_resale["Resale_Ratio"]],
+        textposition="outside",
+        textfont=dict(size=9, color=INK2),
+        hovertemplate="<b>%{y}</b><br>Retains %{x:.1f}% of value<extra></extra>",
+    ))
+    fig_res.update_layout(**plot_layout(height=290, margin=dict(l=8, r=50, t=10, b=8)))
+    style_axes(fig_res, x_title="Retention (%)", show_ygrid=False)
+    fig_res.update_xaxes(range=[0, 110])
+    st.plotly_chart(fig_res, use_container_width=True, config={"displayModeBar": False})
+    st.markdown('</div>', unsafe_allow_html=True)
+
+with r3b:
+    st.markdown('<div class="chart-card">', unsafe_allow_html=True)
+    st.markdown('<div class="chart-title">Correlation Matrix</div>', unsafe_allow_html=True)
+    st.markdown('<div class="chart-sub">Pearson correlations between numeric features · Red = negative, Blue = positive</div>', unsafe_allow_html=True)
+
+    num_cols = ["Sales_in_thousands", "Price_in_thousands", "Horsepower",
+                "Fuel_efficiency", "Engine_size", "Curb_weight",
+                "Power_perf_factor", "Resale_Ratio"]
+    corr_labels = ["Sales", "Price", "Horsepower", "MPG", "Engine", "Weight", "PerfFactor", "Resale"]
+    corr_mat = df[num_cols].corr().round(2)
 
     fig_heat = go.Figure(go.Heatmap(
-        z=corr_df.values,
-        x=labels_clean,
-        y=labels_clean,
-        colorscale=[[0, "#F43F5E"], [0.5, "#0B1622"], [1, "#0EA5C9"]],
+        z=corr_mat.values,
+        x=corr_labels,
+        y=corr_labels,
+        colorscale=[[0, ACCENT], [0.5, SURFACE], [1, BLUE]],
         zmid=0,
-        text=corr_df.values,
+        text=corr_mat.values,
         texttemplate="%{text:.2f}",
-        textfont=dict(size=9, color="#E2E8F0"),
-        hovertemplate="<b>%{y} × %{x}</b><br>Correlation: %{z:.2f}<extra></extra>",
+        textfont=dict(size=9, color=INK),
+        hovertemplate="<b>%{y} × %{x}</b><br>r = %{z:.2f}<extra></extra>",
         showscale=True,
         colorbar=dict(
-            thickness=12, len=0.8,
-            tickfont=dict(color=FONT_CLR, size=10),
+            thickness=10, len=0.8,
+            tickfont=dict(size=9, color=INK2),
+            title=dict(text="r", font=dict(size=10, color=INK2)),
         ),
     ))
-    fig_heat.update_layout(**base_layout(height=420, margin=dict(l=10, r=10, t=10, b=10)))
-    fig_heat.update_xaxes(tickangle=-35, tickfont=dict(size=10, color=FONT_CLR))
-    fig_heat.update_yaxes(tickfont=dict(size=10, color=FONT_CLR))
-    st.plotly_chart(fig_heat, use_container_width=True)
+    fig_heat.update_layout(**plot_layout(height=290, margin=dict(l=8, r=8, t=10, b=8)))
+    fig_heat.update_xaxes(tickangle=-30, tickfont=dict(size=9), gridcolor="rgba(0,0,0,0)")
+    fig_heat.update_yaxes(tickfont=dict(size=9), gridcolor="rgba(0,0,0,0)")
+    st.plotly_chart(fig_heat, use_container_width=True, config={"displayModeBar": False})
+    st.markdown('</div>', unsafe_allow_html=True)
 
+# ─────────────────────────────────────────────────────────────
+# ROW 4 — Data Table
+# ─────────────────────────────────────────────────────────────
+st.markdown('<div class="chart-card">', unsafe_allow_html=True)
 
-# ══════════════════════════════════════════════
-# TAB 4 — PRICE & VALUE
-# ══════════════════════════════════════════════
-with tab4:
-    st.markdown('<p class="section-title">💰 Price Intelligence & Resale Value</p>', unsafe_allow_html=True)
-    st.markdown('<p class="section-sub">Where does the money go? Analyze pricing dynamics, depreciation, and value retention</p>', unsafe_allow_html=True)
+t_col1, t_col2 = st.columns([3, 1])
+with t_col1:
+    st.markdown('<div class="chart-title">Model Explorer</div>', unsafe_allow_html=True)
+    st.markdown('<div class="chart-sub">Full filtered dataset — sortable, searchable, downloadable</div>', unsafe_allow_html=True)
+with t_col2:
+    search = st.text_input("", placeholder="🔎 Search brand or model…", label_visibility="collapsed")
 
-    col1, col2 = st.columns([3, 2])
+# Apply search
+tbl = df.copy()
+if search:
+    mask = (
+        tbl["Model"].str.contains(search, case=False, na=False) |
+        tbl["Manufacturer"].str.contains(search, case=False, na=False)
+    )
+    tbl = tbl[mask]
 
-    with col1:
-        # Price vs Resale Ratio scatter
-        fig_resale = px.scatter(
-            df,
-            x="Price_in_thousands",
-            y="__year_resale_value",
-            color="Manufacturer",
-            size="Sales_in_thousands",
-            hover_name="Model",
-            hover_data={
-                "Manufacturer": True,
-                "Price_in_thousands": ":.1f",
-                "__year_resale_value": ":.2f",
-                "Resale_Ratio": ":.2f",
-                "Sales_in_thousands": ":.1f"
-            },
-            color_discrete_sequence=PALETTE,
-            labels={
-                "Price_in_thousands": "Original Price ($K)",
-                "__year_resale_value": "Resale Value ($K)",
-            },
-            title="Price vs. Resale Value (bubble = sales volume)",
-        )
-        # Add reference line (resale = price)
-        max_p = df["Price_in_thousands"].max()
-        fig_resale.add_trace(go.Scatter(
-            x=[0, max_p], y=[0, max_p],
-            mode="lines",
-            line=dict(dash="dot", color=FONT_CLR, width=1),
-            name="Resale = Price",
-            showlegend=True,
-        ))
-        add_ols_trendline(fig_resale, df["Price_in_thousands"], df["__year_resale_value"], color=TEAL, opacity=0.5)
-        fig_resale.update_traces(
-            selector=dict(mode="markers"),
-            marker=dict(opacity=0.75, line=dict(width=0.5, color="rgba(255,255,255,0.15)"))
-        )
-        fig_resale.update_layout(**base_layout(height=400))
-        style_axes(fig_resale)
-        st.plotly_chart(fig_resale, use_container_width=True)
+display_cols = {
+    "Manufacturer": "Brand",
+    "Model": "Model",
+    "Vehicle_type": "Type",
+    "Price_Segment": "Tier",
+    "Sales_in_thousands": "Sales (K)",
+    "Price_in_thousands": "Price ($K)",
+    "Horsepower": "HP",
+    "Fuel_efficiency": "MPG",
+    "Engine_size": "Engine (L)",
+    "Resale_Ratio": "Resale Ratio",
+    "Power_perf_factor": "Perf Factor",
+}
 
-    with col2:
-        # Best Resale Ratio Top 10
-        st.markdown('<p class="section-title" style="font-size:1.1rem">🔝 Best Value Retention</p>', unsafe_allow_html=True)
-        st.markdown('<p class="section-sub">Resale / Original Price ratio</p>', unsafe_allow_html=True)
+tbl_show = tbl[list(display_cols.keys())].rename(columns=display_cols)
+tbl_show["Sales (K)"]     = tbl_show["Sales (K)"].round(1)
+tbl_show["Price ($K)"]    = tbl_show["Price ($K)"].round(1)
+tbl_show["HP"]            = tbl_show["HP"].round(0).astype(int)
+tbl_show["MPG"]           = tbl_show["MPG"].round(1)
+tbl_show["Engine (L)"]    = tbl_show["Engine (L)"].round(1)
+tbl_show["Resale Ratio"]  = (tbl_show["Resale Ratio"] * 100).round(1).astype(str) + "%"
+tbl_show["Perf Factor"]   = tbl_show["Perf Factor"].round(1)
 
-        top_resale = df.nlargest(10, "Resale_Ratio")[["Manufacturer","Model","Resale_Ratio","Price_in_thousands"]].reset_index(drop=True)
-        top_resale.index += 1
+st.dataframe(
+    tbl_show.sort_values("Sales (K)", ascending=False).reset_index(drop=True),
+    use_container_width=True,
+    height=300,
+)
 
-        for _, row in top_resale.iterrows():
-            pct = row["Resale_Ratio"] * 100
-            color = MINT if pct >= 70 else (GOLD if pct >= 55 else FONT_CLR)
-            st.markdown(f"""
-            <div style='display:flex; align-items:center; justify-content:space-between;
-                        padding: 0.5rem 0.75rem; margin-bottom: 0.4rem;
-                        background: rgba(20,36,58,0.8); border: 1px solid {GRID_CLR};
-                        border-radius: 8px;'>
-                <div>
-                    <div style='font-size:0.85rem; color:#E2E8F0; font-weight:500'>{row['Manufacturer']} {row['Model']}</div>
-                    <div style='font-size:0.72rem; color:{FONT_CLR}'>Orig. ${row['Price_in_thousands']:.1f}K</div>
-                </div>
-                <div style='text-align:right;'>
-                    <div style='font-size:1.0rem; font-weight:700; color:{color}'>{pct:.1f}%</div>
-                    <div style='font-size:0.7rem; color:{FONT_CLR}'>retained</div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-    # ── Row 2
-    st.markdown('<div class="fancy-divider"></div>', unsafe_allow_html=True)
-    col3, col4 = st.columns(2)
-
-    with col3:
-        # Price by Manufacturer — Box Plot
-        fig_box = go.Figure()
-        mfrs_sorted = df.groupby("Manufacturer")["Price_in_thousands"].median().sort_values(ascending=False).index[:16]
-        for i, mfr in enumerate(mfrs_sorted):
-            sub = df[df["Manufacturer"] == mfr]["Price_in_thousands"]
-            fig_box.add_trace(go.Box(
-                y=sub, name=mfr,
-                marker_color=PALETTE[i % len(PALETTE)],
-                line_color=PALETTE[i % len(PALETTE)],
-                fillcolor=f"rgba({int(PALETTE[i % len(PALETTE)][1:3],16)},{int(PALETTE[i % len(PALETTE)][3:5],16)},{int(PALETTE[i % len(PALETTE)][5:7],16)},0.2)",
-                boxmean="sd",
-                hovertemplate=f"<b>{mfr}</b><br>Price: %{{y:.1f}}K<extra></extra>",
-            ))
-        fig_box.update_layout(
-            **base_layout(height=380, title="Price Range by Manufacturer (Top 16)"),
-            showlegend=False,
-            xaxis=dict(tickangle=-35, tickfont=dict(size=9, color=FONT_CLR)),
-        )
-        style_axes(fig_box)
-        st.plotly_chart(fig_box, use_container_width=True)
-
-    with col4:
-        # Average price per segment + avg resale
-        seg_stats = df.groupby("Price_Segment", observed=True).agg(
-            Avg_Price=("Price_in_thousands", "mean"),
-            Avg_Resale=("__year_resale_value", "mean"),
-            Count=("Model", "count"),
-        ).reset_index()
-
-        fig_seg = go.Figure()
-        fig_seg.add_trace(go.Bar(
-            x=seg_stats["Price_Segment"].astype(str),
-            y=seg_stats["Avg_Price"],
-            name="Avg Original Price",
-            marker_color=TEAL, opacity=0.85,
-        ))
-        fig_seg.add_trace(go.Bar(
-            x=seg_stats["Price_Segment"].astype(str),
-            y=seg_stats["Avg_Resale"],
-            name="Avg Resale Value",
-            marker_color=GOLD, opacity=0.85,
-        ))
-        fig_seg.update_layout(
-            **base_layout(height=380, title="Original vs Resale Value by Segment"),
-            barmode="group",
-            xaxis=dict(tickangle=-10, tickfont=dict(size=10)),
-        )
-        style_axes(fig_seg, showgrid_x=False)
-        st.plotly_chart(fig_seg, use_container_width=True)
-
-    # ── Fuel efficiency vs Price segments
-    st.markdown('<div class="fancy-divider"></div>', unsafe_allow_html=True)
-    col5, col6 = st.columns([2, 3])
-
-    with col5:
-        st.markdown('<p class="section-title">⛽ Efficiency by Segment</p>', unsafe_allow_html=True)
-        seg_eff = df.groupby("Price_Segment", observed=True)["Fuel_efficiency"].mean().reset_index()
-        fig_eff2 = go.Figure(go.Bar(
-            x=seg_eff["Fuel_efficiency"],
-            y=seg_eff["Price_Segment"].astype(str),
-            orientation="h",
-            marker=dict(
-                color=[TEAL, GOLD, CORAL, ROSE],
-                line=dict(width=0),
-            ),
-            text=[f"  {v:.1f} mpg" for v in seg_eff["Fuel_efficiency"]],
-            textposition="outside",
-            textfont=dict(size=11, color=FONT_CLR),
-            hovertemplate="<b>%{y}</b><br>Avg Efficiency: %{x:.1f} mpg<extra></extra>",
-        ))
-        fig_eff2.update_layout(**base_layout(height=250, title=None), showlegend=False)
-        style_axes(fig_eff2, showgrid_y=False)
-        st.plotly_chart(fig_eff2, use_container_width=True)
-
-    with col6:
-        st.markdown('<p class="section-title">🗓️ Price vs Launch Timeline</p>', unsafe_allow_html=True)
-        fig_time = px.scatter(
-            df.dropna(subset=["Launch_Year"]),
-            x="Launch_Year", y="Price_in_thousands",
-            color="Price_Segment",
-            size="Sales_in_thousands",
-            hover_name="Model",
-            hover_data={"Manufacturer": True, "Price_in_thousands": ":.1f"},
-            color_discrete_map={
-                "Economy (<$15K)": TEAL, "Mid-Range ($15-25K)": GOLD,
-                "Premium ($25-35K)": CORAL, "Luxury ($35K+)": ROSE,
-            },
-            labels={"Launch_Year": "Launch Year", "Price_in_thousands": "Price ($K)"},
-        )
-        fig_time.update_traces(marker=dict(opacity=0.8, line=dict(width=0.5, color="rgba(255,255,255,0.15)")))
-        fig_time.update_layout(**base_layout(height=250))
-        style_axes(fig_time)
-        st.plotly_chart(fig_time, use_container_width=True)
-
-
-# ══════════════════════════════════════════════
-# TAB 5 — DATA TABLE
-# ══════════════════════════════════════════════
-with tab5:
-    st.markdown('<p class="section-title">📋 Raw Data Explorer</p>', unsafe_allow_html=True)
-    st.markdown('<p class="section-sub">Full filtered dataset — searchable, sortable, downloadable</p>', unsafe_allow_html=True)
-
-    col_s1, col_s2, col_s3 = st.columns([2, 1, 1])
-    with col_s1:
-        search_text = st.text_input("🔎 SEARCH MODEL OR BRAND", placeholder="e.g. Accord, Toyota, Mustang...")
-    with col_s2:
-        sort_col = st.selectbox("SORT BY", [
-            "Sales_in_thousands", "Price_in_thousands", "Horsepower",
-            "Fuel_efficiency", "Power_perf_factor", "Resale_Ratio"
-        ], format_func=lambda x: x.replace("_", " ").replace("__", "").title())
-    with col_s3:
-        sort_dir = st.radio("ORDER", ["Descending ↓", "Ascending ↑"], horizontal=True)
-
-    # Apply search
-    display_df = df.copy()
-    if search_text:
-        mask = (
-            display_df["Model"].str.contains(search_text, case=False, na=False) |
-            display_df["Manufacturer"].str.contains(search_text, case=False, na=False)
-        )
-        display_df = display_df[mask]
-
-    display_df = display_df.sort_values(sort_col, ascending=(sort_dir == "Ascending ↑"))
-
-    # Nice column selection
-    show_cols = ["Manufacturer","Model","Vehicle_type","Price_Segment",
-                 "Sales_in_thousands","Price_in_thousands","Horsepower",
-                 "Fuel_efficiency","Engine_size","Resale_Ratio","Power_perf_factor","Latest_Launch"]
-    display_df_show = display_df[[c for c in show_cols if c in display_df.columns]].reset_index(drop=True)
-    display_df_show.columns = [c.replace("_in_thousands","").replace("_"," ").replace("__","").title() for c in display_df_show.columns]
-
-    st.markdown(f"<p style='color:{FONT_CLR}; font-size:0.8rem;'>Showing <strong style='color:#E2E8F0'>{len(display_df_show)}</strong> records</p>", unsafe_allow_html=True)
-    st.dataframe(
-        display_df_show,
+dl_col, _ = st.columns([1, 4])
+with dl_col:
+    st.download_button(
+        label="⬇️ Download CSV",
+        data=tbl.to_csv(index=False).encode("utf-8"),
+        file_name="filtered_car_sales.csv",
+        mime="text/csv",
         use_container_width=True,
-        height=400,
     )
 
-    # ── Download
-    col_d1, col_d2 = st.columns([1, 3])
-    with col_d1:
-        csv_out = display_df.to_csv(index=False).encode("utf-8")
-        st.download_button(
-            label="⬇️ Download Filtered CSV",
-            data=csv_out,
-            file_name="filtered_car_sales.csv",
-            mime="text/csv",
-            use_container_width=True,
-        )
+st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── Summary Stats
-    st.markdown('<div class="fancy-divider"></div>', unsafe_allow_html=True)
-    st.markdown('<p class="section-title">📊 Descriptive Statistics</p>', unsafe_allow_html=True)
-    num_summary_cols = ["Sales_in_thousands","Price_in_thousands","Horsepower","Fuel_efficiency",
-                         "Engine_size","Curb_weight","Power_perf_factor","Resale_Ratio"]
-    stat_df = display_df[num_summary_cols].describe().round(2)
-    stat_df.columns = [c.replace("_in_thousands","").replace("_"," ").title() for c in stat_df.columns]
-    st.dataframe(stat_df, use_container_width=True)
-
-# ─────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────
 # FOOTER
-# ─────────────────────────────────────────────
-st.markdown("""
-<div class='fancy-divider'></div>
-<div style='text-align:center; padding: 1rem 0; color: #475569; font-size: 0.78rem; line-height: 2;'>
-    <strong style='color:#0EA5C9; font-family: DM Serif Display, serif; font-size:1rem;'>AutoInsight</strong> · Car Sales Intelligence Dashboard<br>
-    Built with <strong style='color:#E2E8F0;'>Streamlit</strong> + <strong style='color:#E2E8F0;'>Plotly</strong> · Dataset: 157 Models · 30 Manufacturers<br>
-    <span style='color:#0EA5C9;'>Aris Darya Fernanda</span> · Data Analyst & Data Scientist Portfolio · 2025–2026
+# ─────────────────────────────────────────────────────────────
+st.markdown(f"""
+<div style='border-top:1px solid {BORDER}; margin-top:2rem; padding-top:1rem;
+     text-align:center; font-size:0.68rem; color:{INK2}; font-family:JetBrains Mono,monospace;'>
+  AutoInsight · Car Sales Intelligence Dashboard<br>
+  Built with <b style='color:{INK}'>Streamlit</b> + <b style='color:{INK}'>Plotly</b> ·
+  Dataset: 157 Models · 30 Manufacturers<br>
+  <span style='color:{ACCENT}'>Aris Darya Fernanda</span> · Data Analyst & Data Scientist · 2025–2026
 </div>
 """, unsafe_allow_html=True)
