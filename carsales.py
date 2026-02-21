@@ -398,11 +398,13 @@ PALETTE = [TEAL, GOLD, CORAL, MINT, ROSE, PURPLE,
            "#FB7185", "#A78BFA", "#38BDF8", "#FCD34D"]
 
 def base_layout(**kwargs):
+    # Extract margin before building dict to avoid duplicate key error
+    margin = kwargs.pop("margin", dict(l=10, r=10, t=40, b=10))
     return dict(
         paper_bgcolor=PAPER_BG,
         plot_bgcolor=PLOT_BG,
         font=dict(family="DM Sans, sans-serif", color=FONT_CLR, size=12),
-        margin=dict(l=10, r=10, t=40, b=10),
+        margin=margin,
         legend=dict(
             bgcolor="rgba(14,36,58,0.8)",
             bordercolor=GRID_CLR,
@@ -553,7 +555,7 @@ with tab1:
             font=dict(color="#E2E8F0", size=14),
             align="center",
         )
-        fig_donut.update_layout(**base_layout(height=240, title=None), showlegend=False, margin=dict(t=10, b=10, l=10, r=10))
+        fig_donut.update_layout(**base_layout(height=240, title=None, margin=dict(t=10, b=10, l=10, r=10)), showlegend=False)
         st.plotly_chart(fig_donut, use_container_width=True)
 
         st.markdown('<p class="section-title" style="margin-top:0.5rem">Vehicle Type Mix</p>', unsafe_allow_html=True)
@@ -567,7 +569,7 @@ with tab1:
             textfont=dict(size=11, color="#E2E8F0"),
             hovertemplate="<b>%{label}</b><br>%{value:,.0f}K units<extra></extra>",
         ))
-        fig_type.update_layout(**base_layout(height=175, title=None), showlegend=False, margin=dict(t=5, b=5, l=10, r=10))
+        fig_type.update_layout(**base_layout(height=175, title=None, margin=dict(t=5, b=5, l=10, r=10)), showlegend=False)
         st.plotly_chart(fig_type, use_container_width=True)
 
     # ── Row 2: Sales vs Price Scatter + Monthly Launch
@@ -731,7 +733,7 @@ with tab2:
             textposition="outside", textfont=dict(size=10, color=FONT_CLR),
             hovertemplate="<b>%{y}</b><br>Sales: %{x:.1f}K<extra></extra>",
         ))
-        fig_top.update_layout(**base_layout(height=320), showlegend=False, margin=dict(l=120, r=40, t=15, b=10))
+        fig_top.update_layout(**base_layout(height=320, margin=dict(l=120, r=40, t=15, b=10)), showlegend=False)
         style_axes(fig_top, showgrid_y=False)
         st.plotly_chart(fig_top, use_container_width=True)
 
@@ -754,7 +756,7 @@ with tab2:
             textposition="outside", textfont=dict(size=10, color=FONT_CLR),
             hovertemplate="<b>%{y}</b><br>HP: %{x:.0f}<extra></extra>",
         ))
-        fig_hp.update_layout(**base_layout(height=320), showlegend=False, margin=dict(l=120, r=40, t=15, b=10))
+        fig_hp.update_layout(**base_layout(height=320, margin=dict(l=120, r=40, t=15, b=10)), showlegend=False)
         style_axes(fig_hp, showgrid_y=False)
         st.plotly_chart(fig_hp, use_container_width=True)
 
@@ -887,7 +889,7 @@ with tab3:
             tickfont=dict(color=FONT_CLR, size=10),
             title=dict(text="Price $K", font=dict(color=FONT_CLR, size=10))
         ))
-        fig_ppf.update_layout(**base_layout(height=340), margin=dict(l=140, r=20, t=40, b=10))
+        fig_ppf.update_layout(**base_layout(height=340, margin=dict(l=140, r=20, t=40, b=10)))
         style_axes(fig_ppf, showgrid_y=False)
         st.plotly_chart(fig_ppf, use_container_width=True)
 
@@ -918,7 +920,7 @@ with tab3:
             tickfont=dict(color=FONT_CLR, size=10),
         ),
     ))
-    fig_heat.update_layout(**base_layout(height=420), margin=dict(l=10, r=10, t=10, b=10))
+    fig_heat.update_layout(**base_layout(height=420, margin=dict(l=10, r=10, t=10, b=10)))
     fig_heat.update_xaxes(tickangle=-35, tickfont=dict(size=10, color=FONT_CLR))
     fig_heat.update_yaxes(tickfont=dict(size=10, color=FONT_CLR))
     st.plotly_chart(fig_heat, use_container_width=True)
