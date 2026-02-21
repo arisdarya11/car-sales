@@ -73,6 +73,12 @@ def ols_line(x, y):
     x_line = np.array([xc.min(), xc.max()])
     return x_line.tolist(), (m * x_line + b).tolist()
 
+def hex_to_rgba(hex_color, alpha=1.0):
+    """Convert #RRGGBB hex to rgba() string — compatible with all Plotly versions."""
+    h = hex_color.lstrip("#")
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    return f"rgba({r},{g},{b},{alpha})"
+
 # ─────────────────────────────────────────────────────────────
 # GLOBAL CSS
 # ─────────────────────────────────────────────────────────────
@@ -544,7 +550,7 @@ with c2:
             name=str(seg),
             marker=dict(
                 size=np.sqrt(sub["Horsepower"]) * 0.85,
-                color=clr + "99",
+                color=hex_to_rgba(clr, 0.6),
                 line=dict(color=clr, width=1),
             ),
             hovertemplate="<b>%{customdata[0]} %{customdata[1]}</b><br>Price: $%{x:.1f}K<br>Sales: %{y:.1f}K units<extra></extra>",
@@ -556,7 +562,7 @@ with c2:
     if xl:
         fig_scat.add_trace(go.Scatter(
             x=xl, y=yl, mode="lines",
-            line=dict(color=ACCENT + "66", width=1.8, dash="dot"),
+            line=dict(color=hex_to_rgba(ACCENT, 0.4), width=1.8, dash="dot"),
             showlegend=False, hoverinfo="skip",
         ))
 
@@ -589,7 +595,7 @@ with c3:
             y=sub["Fuel_efficiency"],
             mode="markers",
             name=str(seg),
-            marker=dict(size=7, color=clr + "88", line=dict(color=clr, width=0.8)),
+            marker=dict(size=7, color=hex_to_rgba(clr, 0.53), line=dict(color=clr, width=0.8)),
             hovertemplate="<b>%{customdata[0]} %{customdata[1]}</b><br>%{x:.0f} hp · %{y:.1f} mpg<extra></extra>",
             customdata=sub[["Manufacturer", "Model"]].values,
         ))
@@ -599,7 +605,7 @@ with c3:
     if xl:
         fig_eff.add_trace(go.Scatter(
             x=xl, y=yl, mode="lines",
-            line=dict(color=ACCENT + "66", width=1.8, dash="dot"),
+            line=dict(color=hex_to_rgba(ACCENT, 0.4), width=1.8, dash="dot"),
             showlegend=False, hoverinfo="skip",
         ))
 
@@ -628,7 +634,7 @@ with r3a:
         x=top_resale["Resale_Ratio"] * 100,
         y=top_resale.apply(lambda r: f"{r.Manufacturer} {r.Model}", axis=1),
         orientation="h",
-        marker=dict(color=[c + "CC" for c in bar_colors], line=dict(width=0)),
+        marker=dict(color=[hex_to_rgba(c, 0.8) for c in bar_colors], line=dict(width=0)),
         text=[f" {v*100:.1f}%" for v in top_resale["Resale_Ratio"]],
         textposition="outside",
         textfont=dict(size=9, color=INK2),
