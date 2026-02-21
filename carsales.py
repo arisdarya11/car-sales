@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-import plotly.express as px
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -485,9 +484,9 @@ with col_right:
         x=0.5, y=0.5, showarrow=False,
         font=dict(color=INK, size=14), align="center",
     )
+    # ✅ FIX: pass showlegend=True into plot_layout() to avoid duplicate keyword argument error
     fig_seg.update_layout(
-        **plot_layout(height=340, margin=dict(l=8, r=8, t=10, b=8)),
-        showlegend=True,
+        **plot_layout(height=340, margin=dict(l=8, r=8, t=10, b=8), showlegend=True),
         legend=dict(
             orientation="v", x=1.02, y=0.5,
             font=dict(size=10, color=INK2),
@@ -562,8 +561,7 @@ with c2:
         ))
 
     fig_scat.update_layout(
-        **plot_layout(height=290, margin=dict(l=8, r=8, t=10, b=8)),
-        showlegend=True,
+        **plot_layout(height=290, margin=dict(l=8, r=8, t=10, b=8), showlegend=True),
         legend=dict(
             orientation="h", x=0, y=1.08,
             font=dict(size=9, color=INK2),
@@ -596,7 +594,7 @@ with c3:
             customdata=sub[["Manufacturer", "Model"]].values,
         ))
 
-    # OLS trendline (numpy, no statsmodels)
+    # OLS trendline
     xl, yl = ols_line(df["Horsepower"], df["Fuel_efficiency"])
     if xl:
         fig_eff.add_trace(go.Scatter(
@@ -605,10 +603,7 @@ with c3:
             showlegend=False, hoverinfo="skip",
         ))
 
-    fig_eff.update_layout(
-        **plot_layout(height=290, margin=dict(l=8, r=8, t=10, b=8)),
-        showlegend=False,
-    )
+    fig_eff.update_layout(**plot_layout(height=290, margin=dict(l=8, r=8, t=10, b=8)))
     style_axes(fig_eff, x_title="Horsepower", y_title="MPG")
     st.plotly_chart(fig_eff, use_container_width=True, config={"displayModeBar": False})
     st.markdown('</div>', unsafe_allow_html=True)
