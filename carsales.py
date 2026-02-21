@@ -431,6 +431,49 @@ def style_axes(fig, showgrid_x=True, showgrid_y=True):
     )
     return fig
 
+def add_ols_trendline(fig, x_vals, y_vals, color="#FFFFFF", opacity=0.45, name="Trend"):
+    """Add a numpy-based OLS trendline — no statsmodels required."""
+    mask = ~(np.isnan(x_vals) | np.isnan(y_vals))
+    x_c, y_c = np.array(x_vals)[mask], np.array(y_vals)[mask]
+    if len(x_c) < 2:
+        return fig
+    m, b = np.polyfit(x_c, y_c, 1)
+    x_line = np.array([x_c.min(), x_c.max()])
+    y_line = m * x_line + b
+    fig.add_trace(go.Scatter(
+        x=x_line, y=y_line,
+        mode="lines",
+        line=dict(color=color, width=1.8, dash="solid"),
+        opacity=opacity,
+        name=name,
+        showlegend=False,
+        hoverinfo="skip",
+    ))
+    return fig
+
+def add_smooth_trendline(fig, x_vals, y_vals, color="#FFFFFF", opacity=0.55, name="Trend", n_points=60):
+    """Add a numpy-based smoothed trendline using polynomial fit — no statsmodels required."""
+    mask = ~(np.isnan(x_vals) | np.isnan(y_vals))
+    x_c, y_c = np.array(x_vals)[mask], np.array(y_vals)[mask]
+    if len(x_c) < 4:
+        return fig
+    sort_idx = np.argsort(x_c)
+    x_s, y_s = x_c[sort_idx], y_c[sort_idx]
+    # Degree-3 poly for smooth curve
+    coeffs = np.polyfit(x_s, y_s, 3)
+    x_line = np.linspace(x_s.min(), x_s.max(), n_points)
+    y_line = np.polyval(coeffs, x_line)
+    fig.add_trace(go.Scatter(
+        x=x_line, y=y_line,
+        mode="lines",
+        line=dict(color=color, width=2.2, dash="solid"),
+        opacity=opacity,
+        name=name,
+        showlegend=False,
+        hoverinfo="skip",
+    ))
+    return fig
+
 # ─────────────────────────────────────────────
 # HERO HEADER
 # ─────────────────────────────────────────────
@@ -690,7 +733,6 @@ with tab2:
             hover_data={"Manufacturer": True, "Price_in_thousands": ":.1f",
                         "Sales_in_thousands": ":.1f", "Horsepower": ":.0f"},
             color_discrete_sequence=PALETTE,
-            trendline="ols" if show_trendline else None,
             labels={
                 x_metric: x_metric.replace("_", " ").replace("__", "").title(),
                 y_metric: y_metric.replace("_", " ").replace("__", "").title(),
@@ -701,6 +743,8 @@ with tab2:
             selector=dict(mode="markers"),
             marker=dict(size=9, opacity=0.8, line=dict(width=0.5, color="rgba(255,255,255,0.2)")),
         )
+        if show_trendline:
+            add_ols_trendline(fig_exp, df[x_metric], df[y_metric], color=TEAL, opacity=0.6, name="Trend")
         fig_exp.update_layout(**base_layout(height=430))
         style_axes(fig_exp)
         st.plotly_chart(fig_exp, use_container_width=True)
@@ -827,8 +871,9 @@ with tab3:
 
     with col2:
         # Engine Size vs HP
+        _eng_df = df.dropna(subset=["Engine_size","Horsepower"])
         fig_eng = px.scatter(
-            df.dropna(subset=["Engine_size","Horsepower"]),
+            _eng_df,
             x="Engine_size", y="Horsepower",
             color="Price_Segment",
             size="Sales_in_thousands",
@@ -840,8 +885,8 @@ with tab3:
             },
             labels={"Engine_size": "Engine Size (L)", "Horsepower": "Horsepower"},
             title="Engine Size vs Horsepower",
-            trendline="ols",
         )
+        add_ols_trendline(fig_eng, _eng_df["Engine_size"], _eng_df["Horsepower"], color=MINT, opacity=0.55)
         fig_eng.update_traces(
             selector=dict(mode="markers"),
             marker=dict(opacity=0.75, line=dict(width=0.5, color="rgba(255,255,255,0.15)"))
@@ -862,8 +907,8 @@ with tab3:
             color_discrete_sequence=PALETTE,
             labels={"Horsepower": "Horsepower", "Fuel_efficiency": "Fuel Efficiency (mpg)"},
             title="Horsepower vs Fuel Efficiency",
-            trendline="lowess",
         )
+        add_smooth_trendline(fig_eff, df["Horsepower"], df["Fuel_efficiency"], color=GOLD, opacity=0.65)
         fig_eff.update_traces(
             selector=dict(mode="markers"),
             marker=dict(size=8, opacity=0.75, line=dict(width=0.4, color="rgba(255,255,255,0.1)"))
@@ -958,7 +1003,6 @@ with tab4:
                 "__year_resale_value": "Resale Value ($K)",
             },
             title="Price vs. Resale Value (bubble = sales volume)",
-            trendline="ols",
         )
         # Add reference line (resale = price)
         max_p = df["Price_in_thousands"].max()
@@ -969,6 +1013,7 @@ with tab4:
             name="Resale = Price",
             showlegend=True,
         ))
+        add_ols_trendline(fig_resale, df["Price_in_thousands"], df["__year_resale_value"], color=TEAL, opacity=0.5)
         fig_resale.update_traces(
             selector=dict(mode="markers"),
             marker=dict(opacity=0.75, line=dict(width=0.5, color="rgba(255,255,255,0.15)"))
