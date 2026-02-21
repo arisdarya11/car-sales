@@ -398,19 +398,21 @@ PALETTE = [TEAL, GOLD, CORAL, MINT, ROSE, PURPLE,
            "#FB7185", "#A78BFA", "#38BDF8", "#FCD34D"]
 
 def base_layout(**kwargs):
-    # Extract margin before building dict to avoid duplicate key error
+    # Pop overridable defaults to prevent duplicate-key errors when
+    # callers pass the same key both inside base_layout() AND to update_layout().
     margin = kwargs.pop("margin", dict(l=10, r=10, t=40, b=10))
+    legend = kwargs.pop("legend", dict(
+        bgcolor="rgba(14,36,58,0.8)",
+        bordercolor=GRID_CLR,
+        borderwidth=1,
+        font=dict(size=11),
+    ))
     return dict(
         paper_bgcolor=PAPER_BG,
         plot_bgcolor=PLOT_BG,
         font=dict(family="DM Sans, sans-serif", color=FONT_CLR, size=12),
         margin=margin,
-        legend=dict(
-            bgcolor="rgba(14,36,58,0.8)",
-            bordercolor=GRID_CLR,
-            borderwidth=1,
-            font=dict(size=11),
-        ),
+        legend=legend,
         **kwargs
     )
 
@@ -628,8 +630,7 @@ with tab1:
             hovertemplate="%{x}: %{y:,.0f}K units<extra></extra>",
         ), secondary_y=True)
         fig_year.update_layout(
-            **base_layout(height=380),
-            legend=dict(x=0.02, y=0.98, font=dict(size=10)),
+            **base_layout(height=380, legend=dict(x=0.02, y=0.98, font=dict(size=10))),
         )
         fig_year.update_yaxes(gridcolor=GRID_CLR, zeroline=False, tickfont=dict(color=FONT_CLR, size=11))
         fig_year.update_xaxes(gridcolor=GRID_CLR, zeroline=False, tickfont=dict(color=FONT_CLR, size=11))
