@@ -234,6 +234,25 @@ div[data-testid="stSlider"] > div > div > div > div {{
 .hstat-label  {{ font-size:0.63rem; color:{INK2}; text-transform:uppercase; letter-spacing:0.08em; }}
 
 .stDataFrame {{ border-radius:10px; overflow:hidden; }}
+
+/* ── MANUFACTURER CHIP BUTTONS ── */
+/* Style all small buttons inside the chip grid */
+div[data-testid="stButton"] button {{
+    font-size: 0.68rem !important;
+    font-weight: 500 !important;
+    padding: 3px 4px !important;
+    border-radius: 6px !important;
+    height: 28px !important;
+    transition: all 0.15s ease !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}}
+/* All / Clear control buttons */
+div[data-testid="stButton"]:has(button[kind="secondary"]) button {{
+    font-size: 0.7rem !important;
+    border-radius: 7px !important;
+}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -276,19 +295,26 @@ st.markdown(f"""
 # ─────────────────────────────────────────────────────────────
 # ── INLINE FILTER BAR ──
 # ─────────────────────────────────────────────────────────────
+all_mfrs = sorted(df_raw["Manufacturer"].unique())
+
+# Initialize session state for selected manufacturers
+if "sel_mfrs_set" not in st.session_state:
+    st.session_state.sel_mfrs_set = set(all_mfrs)
+
 with st.container():
     st.markdown(f"""
     <div style="background:{SURFACE}; border:1px solid {BORDER}; border-radius:14px;
-         padding:6px 20px 2px; margin-bottom:16px;
+         padding:10px 20px 14px; margin-bottom:16px;
          box-shadow:0 1px 4px rgba(26,23,20,0.06);">
       <div style="font-size:0.62rem; font-weight:700; letter-spacing:0.12em;
-           text-transform:uppercase; color:{ACCENT}; padding-top:8px; margin-bottom:2px;">
+           text-transform:uppercase; color:{ACCENT}; margin-bottom:10px;">
         🎛️ Filters
       </div>
     </div>
     """, unsafe_allow_html=True)
 
-    fc1, fc2, fc3 = st.columns([1, 1, 3])
+    # Row 1: Segment + Type + All/Clear buttons
+    fc1, fc2, fgap, fall, fclear = st.columns([1.2, 1.2, 2, 0.6, 0.6])
 
     with fc1:
         st.markdown("<div class='filter-label'>Segment</div>", unsafe_allow_html=True)
@@ -300,14 +326,61 @@ with st.container():
         type_opts = ["All"] + sorted(df_raw["Vehicle_type"].unique())
         sel_type  = st.selectbox("type", type_opts, label_visibility="collapsed", key="vtype")
 
-    with fc3:
+    with fgap:
         st.markdown("<div class='filter-label'>Manufacturer</div>", unsafe_allow_html=True)
-        all_mfrs = sorted(df_raw["Manufacturer"].unique())
-        sel_mfrs = st.multiselect("mfr", all_mfrs, default=all_mfrs,
-                                  label_visibility="collapsed", key="mfr",
-                                  placeholder="All manufacturers…")
+        st.markdown(f"<div style='font-size:0.68rem;color:{ACCENT};padding-top:6px;'>"
+                    f"{len(st.session_state.sel_mfrs_set)} of {len(all_mfrs)} selected</div>",
+                    unsafe_allow_html=True)
 
-# fixed defaults — no price/sales sliders
+    with fall:
+        st.markdown("<div class='filter-label'>&nbsp;</div>", unsafe_allow_html=True)
+        if st.button("All", key="btn_all", use_container_width=True):
+            st.session_state.sel_mfrs_set = set(all_mfrs)
+            st.rerun()
+
+    with fclear:
+        st.markdown("<div class='filter-label'>&nbsp;</div>", unsafe_allow_html=True)
+        if st.button("Clear", key="btn_clear", use_container_width=True):
+            st.session_state.sel_mfrs_set = set()
+            st.rerun()
+
+# Row 2: Manufacturer chip grid (30 brands, 10 per row)
+st.markdown(f"""
+<div style="background:{SURFACE}; border:1px solid {BORDER}; border-radius:12px;
+     padding:12px 16px 10px; margin-bottom:14px;
+     box-shadow:0 1px 4px rgba(26,23,20,0.04);">
+  <div style="font-size:0.6rem; font-weight:700; letter-spacing:0.1em;
+       text-transform:uppercase; color:{INK2}; margin-bottom:8px;">
+    Click to toggle brands
+  </div>
+""", unsafe_allow_html=True)
+
+# Render chips in rows of 10
+CHIPS_PER_ROW = 10
+rows_of_mfrs = [all_mfrs[i:i+CHIPS_PER_ROW] for i in range(0, len(all_mfrs), CHIPS_PER_ROW)]
+for row_mfrs in rows_of_mfrs:
+    chip_cols = st.columns(len(row_mfrs))
+    for col, mfr in zip(chip_cols, row_mfrs):
+        is_active = mfr in st.session_state.sel_mfrs_set
+        btn_style = f"background:{ACCENT};color:white;border:1.5px solid {ACCENT};" if is_active                     else f"background:{CHIP_BG};color:{INK2};border:1.5px solid {BORDER};"
+        with col:
+            if st.button(
+                mfr,
+                key=f"mfr_{mfr}",
+                use_container_width=True,
+                help=f"{'Deselect' if is_active else 'Select'} {mfr}",
+            ):
+                if is_active:
+                    st.session_state.sel_mfrs_set.discard(mfr)
+                else:
+                    st.session_state.sel_mfrs_set.add(mfr)
+                st.rerun()
+
+st.markdown("</div>", unsafe_allow_html=True)
+
+sel_mfrs = list(st.session_state.sel_mfrs_set)
+
+# fixed defaults
 price_max = 53
 min_sales = 0
 
