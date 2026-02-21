@@ -63,7 +63,6 @@ def style_axes(fig, x_title="", y_title="", show_xgrid=True, show_ygrid=True):
     return fig
 
 def ols_line(x, y):
-    """Pure numpy OLS trendline — no statsmodels needed."""
     arr_x, arr_y = np.array(x, float), np.array(y, float)
     mask = ~(np.isnan(arr_x) | np.isnan(arr_y))
     xc, yc = arr_x[mask], arr_y[mask]
@@ -74,7 +73,6 @@ def ols_line(x, y):
     return x_line.tolist(), (m * x_line + b).tolist()
 
 def hex_to_rgba(hex_color, alpha=1.0):
-    """Convert #RRGGBB hex to rgba() string — compatible with all Plotly versions."""
     h = hex_color.lstrip("#")
     r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
     return f"rgba({r},{g},{b},{alpha})"
@@ -95,7 +93,6 @@ html, body, [class*="css"] {{
 #MainMenu, footer, header {{ visibility: hidden; }}
 .block-container {{ padding: 1.5rem 2rem 3rem !important; max-width: 1400px; }}
 
-/* Sidebar */
 section[data-testid="stSidebar"] {{
     background: {SURFACE} !important;
     border-right: 1px solid {BORDER};
@@ -109,7 +106,6 @@ section[data-testid="stSidebar"] label {{
     color: {INK2} !important;
 }}
 
-/* KPI cards */
 .kpi-card {{
     background: {SURFACE};
     border: 1px solid {BORDER};
@@ -151,7 +147,6 @@ section[data-testid="stSidebar"] label {{
 .kpi-sub {{ font-size: 0.7rem; color: {INK2}; }}
 .kpi-sub b {{ color: {INK}; font-weight: 600; }}
 
-/* Insight pills */
 .insight-row {{ display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 1rem; }}
 .insight-pill {{
     background: {SURFACE};
@@ -171,7 +166,6 @@ section[data-testid="stSidebar"] label {{
 .insight-pill.blue   {{ border-left: 3px solid {BLUE}; }}
 .insight-pill.gold   {{ border-left: 3px solid {GOLD}; }}
 
-/* Chart cards */
 .chart-card {{
     background: {SURFACE};
     border: 1px solid {BORDER};
@@ -195,28 +189,19 @@ section[data-testid="stSidebar"] label {{
     margin-bottom: 10px;
 }}
 
-/* Rank bars */
 .rank-row {{
     display: grid;
-    grid-template-columns: 100px 1fr 55px;
+    grid-template-columns: 110px 1fr 55px;
     align-items: center;
     gap: 8px;
-    margin-bottom: 7px;
+    margin-bottom: 8px;
     font-size: 0.74rem;
 }}
 .rank-name {{ color: {INK}; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
-.rank-bar-bg {{ background: {CHIP_BG}; border-radius: 3px; height: 6px; overflow: hidden; }}
+.rank-bar-bg {{ background: {CHIP_BG}; border-radius: 3px; height: 7px; overflow: hidden; }}
 .rank-bar {{ height: 100%; border-radius: 3px; }}
 .rank-val {{ font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: {INK2}; text-align: right; }}
 
-/* Tier pills */
-.pill {{ display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }}
-.pill-eco  {{ background: #DDEEDE; color: {GREEN}; }}
-.pill-mid  {{ background: #DDEAF5; color: {BLUE}; }}
-.pill-prem {{ background: #FFF0E0; color: {GOLD}; }}
-.pill-lux  {{ background: #FFE0E0; color: {ACCENT}; }}
-
-/* Header */
 .dash-header {{
     display: flex;
     align-items: flex-start;
@@ -252,16 +237,18 @@ section[data-testid="stSidebar"] label {{
     color: {INK};
 }}
 .hstat-label {{ font-size: 0.64rem; color: {INK2}; text-transform: uppercase; letter-spacing: 0.08em; }}
-.divider {{ height: 1px; background: {BORDER}; margin: 1rem 0; }}
 
-/* Dataframe */
 .stDataFrame {{ border-radius: 10px; overflow: hidden; }}
 
-/* Selectbox / slider */
 div[data-baseweb="select"] > div {{
     background: {SURFACE} !important;
     border-color: {BORDER} !important;
     border-radius: 8px !important;
+}}
+
+/* equal-height columns helper */
+[data-testid="column"] > div > div > div > div {{
+    height: 100%;
 }}
 </style>
 """, unsafe_allow_html=True)
@@ -284,7 +271,7 @@ def load_data():
 df_raw = load_data()
 
 # ─────────────────────────────────────────────────────────────
-# SIDEBAR — FILTERS
+# SIDEBAR
 # ─────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown(f"""
@@ -311,8 +298,8 @@ with st.sidebar:
     min_sales = st.slider(" ", 0, 150, 0, label_visibility="collapsed")
 
     st.markdown("**MANUFACTURER**")
-    all_mfrs   = sorted(df_raw["Manufacturer"].unique())
-    sel_mfrs   = st.multiselect("", all_mfrs, default=all_mfrs, label_visibility="collapsed")
+    all_mfrs  = sorted(df_raw["Manufacturer"].unique())
+    sel_mfrs  = st.multiselect("", all_mfrs, default=all_mfrs, label_visibility="collapsed")
 
     st.markdown(f"""
     <hr style='border:none; border-top:1px solid {BORDER}; margin-top:1rem;'>
@@ -324,25 +311,24 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────────────────────
-# FILTER DATA
+# FILTER
 # ─────────────────────────────────────────────────────────────
 df = df_raw.copy()
 if sel_seg  != "All": df = df[df["Price_Segment"] == sel_seg]
 if sel_type != "All": df = df[df["Vehicle_type"]  == sel_type]
 if sel_mfrs:          df = df[df["Manufacturer"].isin(sel_mfrs)]
-df = df[df["Price_in_thousands"]  <= price_max]
-df = df[df["Sales_in_thousands"]  >= min_sales]
+df = df[df["Price_in_thousands"] <= price_max]
+df = df[df["Sales_in_thousands"] >= min_sales]
 
 n       = len(df)
 n_total = len(df_raw)
 
-# Guard: empty state
 if n == 0:
     st.warning("⚠️ No data matches the current filters. Try relaxing your selections.")
     st.stop()
 
 # ─────────────────────────────────────────────────────────────
-# COMPUTED STATS
+# STATS
 # ─────────────────────────────────────────────────────────────
 total_sales = df["Sales_in_thousands"].sum()
 avg_price   = df["Price_in_thousands"].mean()
@@ -356,6 +342,8 @@ top_model   = df.loc[df["Sales_in_thousands"].idxmax()]
 best_mpg    = df.loc[df["Fuel_efficiency"].idxmax()]
 most_hp     = df.loc[df["Horsepower"].idxmax()]
 
+seg_color_map = {"Economy": BLUE, "Mid-Range": GOLD, "Premium": ACCENT, "Luxury": GREEN}
+
 # ─────────────────────────────────────────────────────────────
 # HEADER
 # ─────────────────────────────────────────────────────────────
@@ -367,26 +355,11 @@ st.markdown(f"""
     <div class="logo-sub">Car Sales Market Intelligence · {n} of {n_total} models · {n_brands} brands</div>
   </div>
   <div class="hstats">
-    <div>
-      <div class="hstat-val">{total_sales/1000:.1f}M</div>
-      <div class="hstat-label">Total Units</div>
-    </div>
-    <div>
-      <div class="hstat-val">${avg_price:.1f}K</div>
-      <div class="hstat-label">Avg. Price</div>
-    </div>
-    <div>
-      <div class="hstat-val">{avg_hp:.0f} hp</div>
-      <div class="hstat-label">Avg. Power</div>
-    </div>
-    <div>
-      <div class="hstat-val">{avg_mpg:.1f} mpg</div>
-      <div class="hstat-label">Avg. MPG</div>
-    </div>
-    <div>
-      <div class="hstat-val">{avg_resale:.2f}x</div>
-      <div class="hstat-label">Avg. Resale</div>
-    </div>
+    <div><div class="hstat-val">{total_sales/1000:.1f}M</div><div class="hstat-label">Total Units</div></div>
+    <div><div class="hstat-val">${avg_price:.1f}K</div><div class="hstat-label">Avg. Price</div></div>
+    <div><div class="hstat-val">{avg_hp:.0f} hp</div><div class="hstat-label">Avg. Power</div></div>
+    <div><div class="hstat-val">{avg_mpg:.1f} mpg</div><div class="hstat-label">Avg. MPG</div></div>
+    <div><div class="hstat-val">{avg_resale:.2f}x</div><div class="hstat-label">Avg. Resale</div></div>
   </div>
 </div>
 """, unsafe_allow_html=True)
@@ -405,21 +378,10 @@ def kpi_card(col, color_cls, label, value, sub):
     </div>
     """, unsafe_allow_html=True)
 
-kpi_card(k1, "accent", "Total Sales Volume",
-         f"{total_sales/1000:.1f}M",
-         f"units · <b>{n}</b> models · <b>{n_brands}</b> brands")
-
-kpi_card(k2, "green", "Models Displayed",
-         str(n),
-         f"of <b>{n_total}</b> total models")
-
-kpi_card(k3, "blue", "Avg. Sticker Price",
-         f"${avg_price:.1f}K",
-         f"avg HP: <b>{avg_hp:.0f}</b>")
-
-kpi_card(k4, "gold", "Avg. Fuel Efficiency",
-         f"{avg_mpg:.1f} mpg",
-         f"resale retention: <b>{avg_resale*100:.1f}%</b>")
+kpi_card(k1, "accent", "Total Sales Volume",   f"{total_sales/1000:.1f}M",  f"units · <b>{n}</b> models · <b>{n_brands}</b> brands")
+kpi_card(k2, "green",  "Models Displayed",      str(n),                       f"of <b>{n_total}</b> total models")
+kpi_card(k3, "blue",   "Avg. Sticker Price",    f"${avg_price:.1f}K",         f"avg HP: <b>{avg_hp:.0f}</b>")
+kpi_card(k4, "gold",   "Avg. Fuel Efficiency",  f"{avg_mpg:.1f} mpg",         f"resale retention: <b>{avg_resale*100:.1f}%</b>")
 
 st.markdown("<div style='margin-bottom:1rem'></div>", unsafe_allow_html=True)
 
@@ -428,16 +390,16 @@ st.markdown("<div style='margin-bottom:1rem'></div>", unsafe_allow_html=True)
 # ─────────────────────────────────────────────────────────────
 st.markdown(f"""
 <div class="insight-row">
-  <div class="insight-pill accent">🏆 <b>Top Brand:</b> {top_brand} with {df.groupby("Manufacturer")["Sales_in_thousands"].sum()[top_brand]:,.0f}K units</div>
-  <div class="insight-pill green">⭐ <b>Best Seller:</b> {top_model.Manufacturer} {top_model.Model} ({top_model.Sales_in_thousands:.1f}K units)</div>
+  <div class="insight-pill accent">🏆 <b>Top Brand:</b> {top_brand} — {df.groupby("Manufacturer")["Sales_in_thousands"].sum()[top_brand]:,.0f}K units</div>
+  <div class="insight-pill green">⭐ <b>Best Seller:</b> {top_model.Manufacturer} {top_model.Model} ({top_model.Sales_in_thousands:.1f}K)</div>
   <div class="insight-pill blue">🌿 <b>Best MPG:</b> {best_mpg.Manufacturer} {best_mpg.Model} at {best_mpg.Fuel_efficiency:.1f} mpg</div>
-  <div class="insight-pill gold">⚡ <b>Most Powerful:</b> {most_hp.Manufacturer} {most_hp.Model} with {most_hp.Horsepower:.0f} hp</div>
+  <div class="insight-pill gold">⚡ <b>Most Powerful:</b> {most_hp.Manufacturer} {most_hp.Model} — {most_hp.Horsepower:.0f} hp</div>
 </div>
 """, unsafe_allow_html=True)
 
-# ─────────────────────────────────────────────────────────────
-# ROW 1 — Brand bar + Segment donut
-# ─────────────────────────────────────────────────────────────
+# ═════════════════════════════════════════════════════════════
+# ROW 1 — Brand bar (left) + Segment donut (right)
+# ═════════════════════════════════════════════════════════════
 col_left, col_right = st.columns([3, 2])
 
 with col_left:
@@ -445,10 +407,8 @@ with col_left:
     st.markdown('<div class="chart-title">Sales by Manufacturer</div>', unsafe_allow_html=True)
     st.markdown('<div class="chart-sub">Total units sold (K) — top 12 by volume</div>', unsafe_allow_html=True)
 
-    brand_df = (
-        df.groupby("Manufacturer")["Sales_in_thousands"]
-        .sum().sort_values().tail(12).reset_index()
-    )
+    brand_df = (df.groupby("Manufacturer")["Sales_in_thousands"]
+                .sum().sort_values().tail(12).reset_index())
     colors_bar = [MFR_PALETTE[i % len(MFR_PALETTE)] for i in range(len(brand_df))]
 
     fig_brand = go.Figure(go.Bar(
@@ -461,7 +421,7 @@ with col_left:
         textfont=dict(size=10, color=INK2),
         hovertemplate="<b>%{y}</b><br>Sales: %{x:,.0f}K units<extra></extra>",
     ))
-    fig_brand.update_layout(**plot_layout(height=340, margin=dict(l=8, r=50, t=10, b=8)))
+    fig_brand.update_layout(**plot_layout(height=360, margin=dict(l=8, r=55, t=10, b=8)))
     style_axes(fig_brand, show_xgrid=True, show_ygrid=False)
     st.plotly_chart(fig_brand, use_container_width=True, config={"displayModeBar": False})
     st.markdown('</div>', unsafe_allow_html=True)
@@ -473,6 +433,7 @@ with col_right:
 
     segs     = ["Economy", "Mid-Range", "Premium", "Luxury"]
     seg_vals = [df[df["Price_Segment"] == s]["Sales_in_thousands"].sum() for s in segs]
+    total_seg = sum(seg_vals)
 
     fig_seg = go.Figure(go.Pie(
         labels=segs,
@@ -484,61 +445,92 @@ with col_right:
         hovertemplate="<b>%{label}</b><br>%{value:,.0f}K units<br>%{percent}<extra></extra>",
         sort=False,
     ))
-    total_seg = sum(seg_vals)
     fig_seg.add_annotation(
         text=f"<b>{total_seg/1000:.1f}M</b><br><span style='font-size:10px'>units</span>",
         x=0.5, y=0.5, showarrow=False,
         font=dict(color=INK, size=14), align="center",
     )
-    # ✅ FIX: pass showlegend=True into plot_layout() to avoid duplicate keyword argument error
     fig_seg.update_layout(
-        **plot_layout(height=340, margin=dict(l=8, r=8, t=10, b=8), showlegend=True),
-        legend=dict(
-            orientation="v", x=1.02, y=0.5,
-            font=dict(size=10, color=INK2),
-            bgcolor="rgba(0,0,0,0)",
-        ),
+        **plot_layout(height=280, margin=dict(l=8, r=8, t=10, b=8), showlegend=True),
+        legend=dict(orientation="v", x=1.02, y=0.5,
+                    font=dict(size=10, color=INK2), bgcolor="rgba(0,0,0,0)"),
     )
     st.plotly_chart(fig_seg, use_container_width=True, config={"displayModeBar": False})
+
+    # ── Avg Price per Segment mini bar (fills remaining space)
+    seg_price = [df[df["Price_Segment"] == s]["Price_in_thousands"].mean() for s in segs]
+    fig_sp = go.Figure(go.Bar(
+        x=segs,
+        y=seg_price,
+        marker=dict(color=SEG_COLORS, line=dict(width=0)),
+        text=[f"${v:.1f}K" for v in seg_price],
+        textposition="outside",
+        textfont=dict(size=9, color=INK2),
+        hovertemplate="<b>%{x}</b><br>Avg Price: $%{y:.1f}K<extra></extra>",
+    ))
+    fig_sp.update_layout(**plot_layout(height=140, margin=dict(l=8, r=8, t=28, b=8)),
+                         title=dict(text="Avg Price per Segment", font=dict(size=11, color=INK), x=0))
+    style_axes(fig_sp, y_title="$K", show_xgrid=False)
+    fig_sp.update_yaxes(range=[0, max(seg_price) * 1.3])
+    st.plotly_chart(fig_sp, use_container_width=True, config={"displayModeBar": False})
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ─────────────────────────────────────────────────────────────
-# ROW 2 — Top models rank + Scatter price/sales + HP vs MPG
-# ─────────────────────────────────────────────────────────────
+# ═════════════════════════════════════════════════════════════
+# ROW 2 — Top Models (left) + Price vs Sales + HP vs MPG (right 2)
+# ═════════════════════════════════════════════════════════════
 c1, c2, c3 = st.columns(3)
 
-# ── Top models rank
+# ── Top Models rank list
 with c1:
-    st.markdown('<div class="chart-card" style="height:330px">', unsafe_allow_html=True)
+    st.markdown('<div class="chart-card">', unsafe_allow_html=True)
     st.markdown('<div class="chart-title">Top Models by Sales</div>', unsafe_allow_html=True)
-    st.markdown('<div class="chart-sub">Units (K) — top 8</div>', unsafe_allow_html=True)
+    st.markdown('<div class="chart-sub">Units (K) — top 10</div>', unsafe_allow_html=True)
 
-    top8  = df.nlargest(8, "Sales_in_thousands")
-    max_v = top8["Sales_in_thousands"].max()
-    rank_colors = [ACCENT, BLUE, GREEN, GOLD, "#6B1A4A", "#4A6B1A", "#1A6B6B", "#6B4A1A"]
+    top10 = df.nlargest(10, "Sales_in_thousands")
+    max_v = top10["Sales_in_thousands"].max()
+    rank_colors = [ACCENT, BLUE, GREEN, GOLD, "#6B1A4A", "#4A6B1A", "#1A6B6B", "#6B4A1A", "#4A1A6B", "#6B1A1A"]
 
     bars_html = ""
-    for i, (_, row) in enumerate(top8.iterrows()):
+    for i, (_, row) in enumerate(top10.iterrows()):
         pct = row["Sales_in_thousands"] / max_v * 100
         clr = rank_colors[i % len(rank_colors)]
         bars_html += f"""
         <div class="rank-row">
-          <span class="rank-name" title="{row.Manufacturer} {row.Model}">{row.Manufacturer} <span style='color:{INK2};font-weight:400'>{row.Model}</span></span>
+          <span class="rank-name" title="{row.Manufacturer} {row.Model}">
+            {row.Manufacturer} <span style='color:{INK2};font-weight:400'>{row.Model}</span>
+          </span>
           <div class="rank-bar-bg"><div class="rank-bar" style="width:{pct:.1f}%;background:{clr}"></div></div>
           <span class="rank-val">{row.Sales_in_thousands:.1f}</span>
         </div>"""
     st.markdown(bars_html, unsafe_allow_html=True)
+
+    # ── Mini: Vehicle type sales donut
+    vtype_sales = df.groupby("Vehicle_type")["Sales_in_thousands"].sum().reset_index()
+    vtype_colors = [MFR_PALETTE[i % len(MFR_PALETTE)] for i in range(len(vtype_sales))]
+    fig_vt = go.Figure(go.Pie(
+        labels=vtype_sales["Vehicle_type"],
+        values=vtype_sales["Sales_in_thousands"],
+        hole=0.55,
+        marker=dict(colors=vtype_colors, line=dict(color=SURFACE, width=2)),
+        textinfo="label+percent",
+        textfont=dict(size=9),
+        hovertemplate="<b>%{label}</b><br>%{value:,.0f}K units<extra></extra>",
+        sort=True,
+    ))
+    fig_vt.update_layout(
+        **plot_layout(height=160, margin=dict(l=0, r=0, t=28, b=0), showlegend=False),
+        title=dict(text="Sales by Vehicle Type", font=dict(size=11, color=INK), x=0),
+    )
+    st.plotly_chart(fig_vt, use_container_width=True, config={"displayModeBar": False})
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ── Scatter: Price vs Sales
+# ── Price vs Sales scatter
 with c2:
     st.markdown('<div class="chart-card">', unsafe_allow_html=True)
     st.markdown('<div class="chart-title">Price vs Sales</div>', unsafe_allow_html=True)
     st.markdown('<div class="chart-sub">Bubble size = Horsepower · Color = Tier</div>', unsafe_allow_html=True)
 
-    seg_color_map = {"Economy": BLUE, "Mid-Range": GOLD, "Premium": ACCENT, "Luxury": GREEN}
     fig_scat = go.Figure()
-
     for seg, clr in seg_color_map.items():
         sub = df[df["Price_Segment"] == seg]
         if len(sub) == 0:
@@ -553,11 +545,9 @@ with c2:
                 color=hex_to_rgba(clr, 0.6),
                 line=dict(color=clr, width=1),
             ),
-            hovertemplate="<b>%{customdata[0]} %{customdata[1]}</b><br>Price: $%{x:.1f}K<br>Sales: %{y:.1f}K units<extra></extra>",
+            hovertemplate="<b>%{customdata[0]} %{customdata[1]}</b><br>Price: $%{x:.1f}K<br>Sales: %{y:.1f}K<extra></extra>",
             customdata=sub[["Manufacturer", "Model"]].values,
         ))
-
-    # OLS trendline
     xl, yl = ols_line(df["Price_in_thousands"], df["Sales_in_thousands"])
     if xl:
         fig_scat.add_trace(go.Scatter(
@@ -565,17 +555,34 @@ with c2:
             line=dict(color=hex_to_rgba(ACCENT, 0.4), width=1.8, dash="dot"),
             showlegend=False, hoverinfo="skip",
         ))
-
     fig_scat.update_layout(
-        **plot_layout(height=290, margin=dict(l=8, r=8, t=10, b=8), showlegend=True),
-        legend=dict(
-            orientation="h", x=0, y=1.08,
-            font=dict(size=9, color=INK2),
-            bgcolor="rgba(0,0,0,0)",
-        ),
+        **plot_layout(height=310, margin=dict(l=8, r=8, t=10, b=8), showlegend=True),
+        legend=dict(orientation="h", x=0, y=1.08, font=dict(size=9, color=INK2), bgcolor="rgba(0,0,0,0)"),
     )
     style_axes(fig_scat, x_title="Price ($K)", y_title="Sales (K)")
     st.plotly_chart(fig_scat, use_container_width=True, config={"displayModeBar": False})
+
+    # ── Mini: Engine size vs Curb weight
+    fig_ew = go.Figure()
+    for seg, clr in seg_color_map.items():
+        sub = df[df["Price_Segment"] == seg]
+        if len(sub) == 0:
+            continue
+        fig_ew.add_trace(go.Scatter(
+            x=sub["Engine_size"],
+            y=sub["Curb_weight"],
+            mode="markers",
+            name=str(seg),
+            marker=dict(size=6, color=hex_to_rgba(clr, 0.6), line=dict(color=clr, width=0.7)),
+            hovertemplate="<b>%{customdata[0]} %{customdata[1]}</b><br>Engine: %{x:.1f}L · Weight: %{y:.0f}kg<extra></extra>",
+            customdata=sub[["Manufacturer", "Model"]].values,
+        ))
+    fig_ew.update_layout(
+        **plot_layout(height=175, margin=dict(l=8, r=8, t=28, b=8), showlegend=False),
+        title=dict(text="Engine Size vs Curb Weight", font=dict(size=11, color=INK), x=0),
+    )
+    style_axes(fig_ew, x_title="Engine (L)", y_title="Weight (kg)")
+    st.plotly_chart(fig_ew, use_container_width=True, config={"displayModeBar": False})
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ── HP vs MPG
@@ -585,7 +592,6 @@ with c3:
     st.markdown('<div class="chart-sub">Efficiency tradeoff · Dashed = trend</div>', unsafe_allow_html=True)
 
     fig_eff = go.Figure()
-
     for seg, clr in seg_color_map.items():
         sub = df[df["Price_Segment"] == seg]
         if len(sub) == 0:
@@ -599,8 +605,6 @@ with c3:
             hovertemplate="<b>%{customdata[0]} %{customdata[1]}</b><br>%{x:.0f} hp · %{y:.1f} mpg<extra></extra>",
             customdata=sub[["Manufacturer", "Model"]].values,
         ))
-
-    # OLS trendline
     xl, yl = ols_line(df["Horsepower"], df["Fuel_efficiency"])
     if xl:
         fig_eff.add_trace(go.Scatter(
@@ -608,42 +612,80 @@ with c3:
             line=dict(color=hex_to_rgba(ACCENT, 0.4), width=1.8, dash="dot"),
             showlegend=False, hoverinfo="skip",
         ))
-
-    fig_eff.update_layout(**plot_layout(height=290, margin=dict(l=8, r=8, t=10, b=8)))
+    fig_eff.update_layout(**plot_layout(height=310, margin=dict(l=8, r=8, t=10, b=8)))
     style_axes(fig_eff, x_title="Horsepower", y_title="MPG")
     st.plotly_chart(fig_eff, use_container_width=True, config={"displayModeBar": False})
+
+    # ── Mini: Power Performance Factor by Segment box
+    fig_ppf = go.Figure()
+    for seg, clr in seg_color_map.items():
+        sub = df[df["Price_Segment"] == seg]
+        if len(sub) == 0:
+            continue
+        fig_ppf.add_trace(go.Box(
+            y=sub["Power_perf_factor"],
+            name=str(seg),
+            marker_color=clr,
+            line=dict(color=clr, width=1.5),
+            fillcolor=hex_to_rgba(clr, 0.15),
+            boxmean=True,
+            hovertemplate="<b>%{x}</b><br>Perf: %{y:.1f}<extra></extra>",
+        ))
+    fig_ppf.update_layout(
+        **plot_layout(height=175, margin=dict(l=8, r=8, t=28, b=8), showlegend=False),
+        title=dict(text="Performance Factor by Tier", font=dict(size=11, color=INK), x=0),
+    )
+    style_axes(fig_ppf, y_title="Perf Factor", show_xgrid=False)
+    st.plotly_chart(fig_ppf, use_container_width=True, config={"displayModeBar": False})
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ─────────────────────────────────────────────────────────────
-# ROW 3 — Resale bar + Correlation heatmap
-# ─────────────────────────────────────────────────────────────
+# ═════════════════════════════════════════════════════════════
+# ROW 3 — Resale + Correlation heatmap (full)
+# ═════════════════════════════════════════════════════════════
 r3a, r3b = st.columns([1, 2])
 
 with r3a:
     st.markdown('<div class="chart-card">', unsafe_allow_html=True)
     st.markdown('<div class="chart-title">Best Resale Retention</div>', unsafe_allow_html=True)
-    st.markdown('<div class="chart-sub">Resale value / original price (top 8)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="chart-sub">Resale value / original price — top 10</div>', unsafe_allow_html=True)
 
-    top_resale = df.nlargest(8, "Resale_Ratio")[["Manufacturer", "Model", "Resale_Ratio", "Price_in_thousands"]]
-    top_resale = top_resale.sort_values("Resale_Ratio")
-
-    bar_colors = [GREEN if v >= 0.7 else (GOLD if v >= 0.55 else ACCENT)
-                  for v in top_resale["Resale_Ratio"]]
+    top_resale = df.nlargest(10, "Resale_Ratio").sort_values("Resale_Ratio")
+    bar_colors_r = [GREEN if v >= 0.7 else (GOLD if v >= 0.55 else ACCENT)
+                    for v in top_resale["Resale_Ratio"]]
 
     fig_res = go.Figure(go.Bar(
         x=top_resale["Resale_Ratio"] * 100,
         y=top_resale.apply(lambda r: f"{r.Manufacturer} {r.Model}", axis=1),
         orientation="h",
-        marker=dict(color=[hex_to_rgba(c, 0.8) for c in bar_colors], line=dict(width=0)),
+        marker=dict(color=[hex_to_rgba(c, 0.8) for c in bar_colors_r], line=dict(width=0)),
         text=[f" {v*100:.1f}%" for v in top_resale["Resale_Ratio"]],
         textposition="outside",
         textfont=dict(size=9, color=INK2),
         hovertemplate="<b>%{y}</b><br>Retains %{x:.1f}% of value<extra></extra>",
     ))
-    fig_res.update_layout(**plot_layout(height=290, margin=dict(l=8, r=50, t=10, b=8)))
+    fig_res.update_layout(**plot_layout(height=340, margin=dict(l=8, r=55, t=10, b=8)))
     style_axes(fig_res, x_title="Retention (%)", show_ygrid=False)
-    fig_res.update_xaxes(range=[0, 110])
+    fig_res.update_xaxes(range=[0, 115])
     st.plotly_chart(fig_res, use_container_width=True, config={"displayModeBar": False})
+
+    # ── Mini: Avg Resale Ratio per Segment
+    seg_resale_avg = [df[df["Price_Segment"] == s]["Resale_Ratio"].mean() * 100 for s in segs]
+    fig_sr = go.Figure(go.Bar(
+        x=segs,
+        y=seg_resale_avg,
+        marker=dict(color=SEG_COLORS, line=dict(width=0)),
+        text=[f"{v:.1f}%" for v in seg_resale_avg],
+        textposition="outside",
+        textfont=dict(size=9, color=INK2),
+        hovertemplate="<b>%{x}</b><br>Avg Resale: %{y:.1f}%<extra></extra>",
+    ))
+    fig_sr.update_layout(
+        **plot_layout(height=160, margin=dict(l=8, r=8, t=28, b=8)),
+        title=dict(text="Avg Resale Rate by Segment", font=dict(size=11, color=INK), x=0),
+    )
+    style_axes(fig_sr, y_title="%", show_xgrid=False)
+    fig_sr.update_yaxes(range=[0, max(seg_resale_avg) * 1.3])
+    st.plotly_chart(fig_sr, use_container_width=True, config={"displayModeBar": False})
     st.markdown('</div>', unsafe_allow_html=True)
 
 with r3b:
@@ -668,31 +710,53 @@ with r3b:
         textfont=dict(size=9, color=INK),
         hovertemplate="<b>%{y} × %{x}</b><br>r = %{z:.2f}<extra></extra>",
         showscale=True,
-        colorbar=dict(
-            thickness=10, len=0.8,
-            tickfont=dict(size=9, color=INK2),
-            title=dict(text="r", font=dict(size=10, color=INK2)),
-        ),
+        colorbar=dict(thickness=10, len=0.8,
+                      tickfont=dict(size=9, color=INK2),
+                      title=dict(text="r", font=dict(size=10, color=INK2))),
     ))
-    fig_heat.update_layout(**plot_layout(height=290, margin=dict(l=8, r=8, t=10, b=8)))
+    fig_heat.update_layout(**plot_layout(height=340, margin=dict(l=8, r=8, t=10, b=8)))
     fig_heat.update_xaxes(tickangle=-30, tickfont=dict(size=9), gridcolor="rgba(0,0,0,0)")
     fig_heat.update_yaxes(tickfont=dict(size=9), gridcolor="rgba(0,0,0,0)")
     st.plotly_chart(fig_heat, use_container_width=True, config={"displayModeBar": False})
+
+    # ── Mini: Top 5 strongest correlations (absolute) with Sales
+    corr_with_sales = corr_mat["Sales_in_thousands"].drop("Sales_in_thousands").abs().sort_values(ascending=False)
+    top_corr = corr_mat["Sales_in_thousands"].drop("Sales_in_thousands").reindex(corr_with_sales.index)
+    corr_colors = [GREEN if v > 0 else ACCENT for v in top_corr.values]
+    labels_map  = dict(zip(num_cols[1:], corr_labels[1:]))
+    nice_labels = [labels_map.get(i, i) for i in top_corr.index]
+
+    fig_corr_bar = go.Figure(go.Bar(
+        x=nice_labels,
+        y=top_corr.values,
+        marker=dict(color=[hex_to_rgba(c, 0.8) for c in corr_colors], line=dict(width=0)),
+        text=[f"{v:+.2f}" for v in top_corr.values],
+        textposition="outside",
+        textfont=dict(size=9, color=INK2),
+        hovertemplate="<b>%{x}</b> ↔ Sales<br>r = %{y:.2f}<extra></extra>",
+    ))
+    fig_corr_bar.add_hline(y=0, line_color=BORDER, line_width=1)
+    fig_corr_bar.update_layout(
+        **plot_layout(height=165, margin=dict(l=8, r=8, t=28, b=8)),
+        title=dict(text="Feature Correlation with Sales", font=dict(size=11, color=INK), x=0),
+    )
+    style_axes(fig_corr_bar, y_title="r", show_xgrid=False)
+    fig_corr_bar.update_yaxes(range=[min(top_corr.values) * 1.4, max(top_corr.values) * 1.4])
+    st.plotly_chart(fig_corr_bar, use_container_width=True, config={"displayModeBar": False})
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ─────────────────────────────────────────────────────────────
-# ROW 4 — Data Table
-# ─────────────────────────────────────────────────────────────
+# ═════════════════════════════════════════════════════════════
+# ROW 4 — Data Table (full width)
+# ═════════════════════════════════════════════════════════════
 st.markdown('<div class="chart-card">', unsafe_allow_html=True)
 
 t_col1, t_col2 = st.columns([3, 1])
 with t_col1:
     st.markdown('<div class="chart-title">Model Explorer</div>', unsafe_allow_html=True)
-    st.markdown('<div class="chart-sub">Full filtered dataset — sortable, searchable, downloadable</div>', unsafe_allow_html=True)
+    st.markdown('<div class="chart-sub">Full filtered dataset — sortable & downloadable</div>', unsafe_allow_html=True)
 with t_col2:
     search = st.text_input("", placeholder="🔎 Search brand or model…", label_visibility="collapsed")
 
-# Apply search
 tbl = df.copy()
 if search:
     mask = (
@@ -702,32 +766,25 @@ if search:
     tbl = tbl[mask]
 
 display_cols = {
-    "Manufacturer": "Brand",
-    "Model": "Model",
-    "Vehicle_type": "Type",
-    "Price_Segment": "Tier",
-    "Sales_in_thousands": "Sales (K)",
-    "Price_in_thousands": "Price ($K)",
-    "Horsepower": "HP",
-    "Fuel_efficiency": "MPG",
-    "Engine_size": "Engine (L)",
-    "Resale_Ratio": "Resale Ratio",
-    "Power_perf_factor": "Perf Factor",
+    "Manufacturer": "Brand", "Model": "Model", "Vehicle_type": "Type",
+    "Price_Segment": "Tier", "Sales_in_thousands": "Sales (K)",
+    "Price_in_thousands": "Price ($K)", "Horsepower": "HP",
+    "Fuel_efficiency": "MPG", "Engine_size": "Engine (L)",
+    "Resale_Ratio": "Resale Ratio", "Power_perf_factor": "Perf Factor",
 }
-
 tbl_show = tbl[list(display_cols.keys())].rename(columns=display_cols)
-tbl_show["Sales (K)"]     = tbl_show["Sales (K)"].round(1)
-tbl_show["Price ($K)"]    = tbl_show["Price ($K)"].round(1)
-tbl_show["HP"]            = tbl_show["HP"].round(0).astype(int)
-tbl_show["MPG"]           = tbl_show["MPG"].round(1)
-tbl_show["Engine (L)"]    = tbl_show["Engine (L)"].round(1)
-tbl_show["Resale Ratio"]  = (tbl_show["Resale Ratio"] * 100).round(1).astype(str) + "%"
-tbl_show["Perf Factor"]   = tbl_show["Perf Factor"].round(1)
+tbl_show["Sales (K)"]    = tbl_show["Sales (K)"].round(1)
+tbl_show["Price ($K)"]   = tbl_show["Price ($K)"].round(1)
+tbl_show["HP"]           = tbl_show["HP"].round(0).astype(int)
+tbl_show["MPG"]          = tbl_show["MPG"].round(1)
+tbl_show["Engine (L)"]   = tbl_show["Engine (L)"].round(1)
+tbl_show["Resale Ratio"] = (tbl_show["Resale Ratio"] * 100).round(1).astype(str) + "%"
+tbl_show["Perf Factor"]  = tbl_show["Perf Factor"].round(1)
 
 st.dataframe(
     tbl_show.sort_values("Sales (K)", ascending=False).reset_index(drop=True),
     use_container_width=True,
-    height=300,
+    height=320,
 )
 
 dl_col, _ = st.columns([1, 4])
@@ -739,7 +796,6 @@ with dl_col:
         mime="text/csv",
         use_container_width=True,
     )
-
 st.markdown('</div>', unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────────────────────
